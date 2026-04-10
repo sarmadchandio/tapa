@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tapa"
+version = "0.1.0"
+description = "Speaker diarization + phonetic analysis pipeline (Whisper, MFA, Praat)"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "TAPA Contributors"},
+]
+keywords = ["speech", "diarization", "phonetics", "formants", "whisper", "linguistics"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+
+dependencies = [
+    "torch>=2.0",
+    "torchaudio>=2.0",
+    "openai-whisper",
+    "praat-parselmouth",
+    "librosa",
+    "resemblyzer",
+    "nltk",
+    "praatio",
+    "soundfile",
+    "scipy",
+    "numpy",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+mfa = [
+    "montreal-forced-aligner",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/tapa"
+Repository = "https://github.com/yourusername/tapa"
+Issues = "https://github.com/yourusername/tapa/issues"
+
+[project.scripts]
+tapa = "tapa.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tapa*"]

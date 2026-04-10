@@ -19,13 +19,13 @@ Given an audio file, TAPA will:
 ### From GitHub
 
 ```bash
-pip install git+https://github.com/yourusername/tapa.git
+pip install git+https://github.com/sarmadchandio/tapa.git
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/yourusername/tapa.git
+git clone https://github.com/sarmadchandio/tapa.git
 cd tapa
 pip install -e .
 ```

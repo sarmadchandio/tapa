@@ -43,9 +43,9 @@ mfa = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/tapa"
-Repository = "https://github.com/yourusername/tapa"
-Issues = "https://github.com/yourusername/tapa/issues"
+Homepage = "https://github.com/sarmadchandio/tapa"
+Repository = "https://github.com/sarmadchandio/tapa"
+Issues = "https://github.com/sarmadchandio/tapa/issues"
 
 [project.scripts]
 tapa = "tapa.cli:main"

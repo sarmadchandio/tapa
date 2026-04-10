@@ -22,9 +22,11 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 
+# torch and torchaudio are NOT listed here to avoid overwriting
+# Colab/conda pre-installed CUDA builds with CPU-only PyPI versions.
+# openai-whisper pulls in torch transitively.
+# For local installs without torch, run: pip install torch torchaudio
 dependencies = [
-    "torch>=2.0",
-    "torchaudio>=2.0",
     "openai-whisper",
     "praat-parselmouth",
     "librosa",
@@ -38,9 +40,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-mfa = [
-    "montreal-forced-aligner",
-]
+mfa = ["montreal-forced-aligner"]
 
 [project.urls]
 Homepage = "https://github.com/sarmadchandio/tapa"

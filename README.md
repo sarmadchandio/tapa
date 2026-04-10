@@ -40,6 +40,49 @@ mfa model download acoustic english_us_arpa
 mfa model download dictionary english_us_arpa
 ```
 
+### Google Colab setup
+
+Colab has torch and ffmpeg pre-installed, so just install TAPA:
+
+```python
+!pip install -q git+https://github.com/sarmadchandio/tapa.git
+```
+
+To add MFA support (Colab doesn't have conda, so use Miniforge):
+
+```python
+import os, subprocess
+
+# Install Miniforge + MFA (takes 2-4 minutes on first run)
+if not os.path.exists("/opt/miniforge"):
+    !wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+    !bash Miniforge3-Linux-x86_64.sh -b -p /opt/miniforge > /dev/null 2>&1
+
+!/opt/miniforge/bin/mamba install -c conda-forge montreal-forced-aligner -y -q 2>&1 | tail -3
+!/opt/miniforge/bin/mfa model download acoustic english_us_arpa
+!/opt/miniforge/bin/mfa model download dictionary english_us_arpa
+
+# Add to PATH so TAPA can find it
+os.environ["PATH"] = "/opt/miniforge/bin:" + os.environ["PATH"]
+```
+
+Then use TAPA normally:
+
+```python
+from tapa import TAPAPipeline, TAPAConfig
+
+# Point to the MFA binary (or skip this if you added it to PATH above)
+cfg = TAPAConfig(mfa_bin="/opt/miniforge/bin/mfa")
+pipeline = TAPAPipeline(config=cfg)
+results = pipeline.run("your_audio.mp3")
+```
+
+**Colab notes:**
+- Colab already has torch with CUDA and ffmpeg — no extra setup needed for those
+- Use a **GPU runtime** (Runtime > Change runtime type > GPU) for best performance
+- Free tier has ~12GB RAM — large audio files (>1 hour) may need `whisper_model="tiny.en"` to fit in memory
+- MFA install persists within a session but resets when the runtime disconnects
+
 ## Quick Start
 
 ```python

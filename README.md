@@ -57,12 +57,11 @@ mfa model download dictionary english_us_arpa
 
 ## Quick Start
 
-### Python API
+### Full pipeline (all steps at once)
 
 ```python
 from tapa import TAPAPipeline
 
-# Initialize and run on a single file
 pipeline = TAPAPipeline()
 results = pipeline.run("interview.mp3")
 
@@ -71,6 +70,62 @@ for speaker, vowels in results["vowel_averages"].items():
     print(f"\n{speaker}:")
     for vowel, data in vowels.items():
         print(f"  /{vowel}/  F1={data['mean_f1']:.0f}  F2={data['mean_f2']:.0f}  (n={data['n_after_filtering']})")
+```
+
+### Use individual components
+
+Each step of the pipeline can be used independently:
+
+```python
+from tapa import diarize, transcribe, align, extract_formants, extract_consonants, compute_averages
+
+# 1. Just diarize — who is speaking when?
+segments = diarize("interview.mp3")
+for seg in segments:
+    print(f"  {seg['speaker']}: {seg['start']:.1f}s - {seg['end']:.1f}s")
+
+# 2. Just transcribe — what are they saying?
+words = transcribe("interview.mp3")
+for w in words[:10]:
+    print(f"  {w['word']} ({w['start']:.2f}s - {w['end']:.2f}s)")
+
+# 3. Force-align phonemes (MFA or CMUdict fallback)
+phones = align("interview.mp3", words)
+
+# 4. Extract vowel formants (F1, F2, pitch)
+#    Pass segments from diarize() to get per-speaker results
+formants = extract_formants("interview.mp3", segments)
+for speaker, vowels in formants.items():
+    for vowel, measurements in vowels.items():
+        print(f"  {speaker} /{vowel}/: {len(measurements)} tokens")
+
+# 5. Extract consonant measurements (stop VOT + fricative spectral moments)
+stop_data, fricative_data = extract_consonants("interview.mp3", segments)
+
+# 6. Compute averages with outlier rejection
+avgs = compute_averages(
+    vowel_data=formants,
+    stop_data=stop_data,
+    fricative_data=fricative_data,
+)
+```
+
+### Mix and match
+
+You can combine steps however you want:
+
+```python
+from tapa import diarize, transcribe, extract_formants
+
+# Diarize with known speaker count, then just get formants
+segments = diarize("podcast.mp3", num_speakers=3)
+formants = extract_formants("podcast.mp3", segments)
+
+# Transcribe without diarization
+words = transcribe("lecture.wav", model_name="medium.en")
+
+# Extract formants treating entire audio as one speaker (no diarization)
+formants = extract_formants("single_speaker.wav")
 ```
 
 ### Command line
@@ -170,6 +225,31 @@ for speaker, vowels in results["vowel_data"].items():
     for vowel_ipa, measurements in vowels.items():
         print(f"  {speaker} /{vowel_ipa}/: {len(measurements)} tokens")
 ```
+
+## API Reference
+
+### Convenience functions
+
+All importable directly from `tapa`:
+
+| Function | Description | Returns |
+|----------|-------------|---------|
+| `diarize(audio_path, num_speakers=None)` | Speaker diarization | `[{"speaker", "start", "end"}]` |
+| `transcribe(audio_path, model_name="small.en")` | Whisper transcription | `[{"word", "start", "end"}]` |
+| `align(audio_path, words)` | Forced phoneme alignment | `[{"phone", "start", "end"}]` |
+| `extract_formants(audio_path, segments=None)` | Vowel F1/F2/pitch | `{speaker: {vowel: [measurements]}}` |
+| `extract_consonants(audio_path, segments=None)` | Stop VOT + fricative spectra | `(stop_data, fricative_data)` |
+| `compute_averages(vowel_data, stop_data, fricative_data)` | Per-speaker averages with outlier rejection | `{"vowel_averages", "stop_averages", "fricative_averages"}` |
+
+### Pipeline class
+
+For running the full pipeline with model caching (recommended for batch processing):
+
+| Method | Description |
+|--------|-------------|
+| `TAPAPipeline(config=None)` | Initialize with optional `TAPAConfig` |
+| `pipeline.run(audio_path)` | Process a single file, returns results dict |
+| `pipeline.run_batch(audio_dir)` | Process all audio files in a directory |
 
 ## Configuration Reference
 

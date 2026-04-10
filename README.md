@@ -110,22 +110,75 @@ avgs = compute_averages(
 )
 ```
 
+### Processing multiple files
+
+When processing multiple files, use `load_models()` to load models once and reuse them.
+This avoids reloading Whisper, VAD, and Resemblyzer on every call:
+
+```python
+from tapa import load_models, diarize, transcribe, extract_formants
+
+# Load all models once — prints device info (CUDA/CPU)
+models = load_models()
+# Output: TAPA: Using device: NVIDIA A100-SXM4-40GB (CUDA)
+#         Loading models...
+#         Models loaded.
+
+audio_files = ["interview1.mp3", "interview2.mp3", "podcast.wav"]
+for f in audio_files:
+    segments = diarize(f, models=models)
+    words = transcribe(f, models=models)
+    formants = extract_formants(f, segments, models=models)
+    print(f"{f}: {len(segments)} segments, {len(words)} words")
+```
+
+Without `models=`, each function loads its own models from scratch every call — fine for
+a single file, but slow if you're processing many.
+
 ### Mix and match
 
 You can combine steps however you want:
 
 ```python
-from tapa import diarize, transcribe, extract_formants
+from tapa import load_models, diarize, transcribe, extract_formants
+
+models = load_models()
 
 # Diarize with known speaker count, then just get formants
-segments = diarize("podcast.mp3", num_speakers=3)
-formants = extract_formants("podcast.mp3", segments)
+segments = diarize("podcast.mp3", num_speakers=3, models=models)
+formants = extract_formants("podcast.mp3", segments, models=models)
 
 # Transcribe without diarization
-words = transcribe("lecture.wav", model_name="medium.en")
+words = transcribe("lecture.wav", models=models)
 
 # Extract formants treating entire audio as one speaker (no diarization)
-formants = extract_formants("single_speaker.wav")
+formants = extract_formants("single_speaker.wav", models=models)
+```
+
+### Full pipeline batch processing
+
+For running every step on a whole directory at once, use `TAPAPipeline`:
+
+```python
+from tapa import TAPAPipeline
+
+pipeline = TAPAPipeline()
+
+# Process all audio files in a directory (models loaded once automatically)
+results = pipeline.run_batch(audio_dir="recordings/", results_dir="output/")
+
+# results is a dict: {filename: result_dict}
+for filename, result in results.items():
+    n_speakers = len(set(s["speaker"] for s in result["diarization"]))
+    print(f"{filename}: {n_speakers} speakers")
+```
+
+Or run specific files through the full pipeline:
+
+```python
+pipeline = TAPAPipeline()
+for f in ["file1.mp3", "file2.wav", "file3.flac"]:
+    results = pipeline.run(f)  # models loaded once on first call
 ```
 
 ### Command line
@@ -143,8 +196,10 @@ tapa podcast.mp3 --num-speakers 3 --whisper-model medium.en
 
 ### With custom configuration
 
+Configuration works with both the pipeline and standalone functions:
+
 ```python
-from tapa import TAPAPipeline, TAPAConfig
+from tapa import TAPAPipeline, TAPAConfig, load_models, diarize
 
 cfg = TAPAConfig(
     num_speakers=2,              # Force 2-speaker detection
@@ -154,24 +209,13 @@ cfg = TAPAConfig(
     mad_threshold=2.5,           # Looser outlier rejection
 )
 
+# With the full pipeline
 pipeline = TAPAPipeline(config=cfg)
 results = pipeline.run("dialogue.wav")
-```
 
-### Batch processing
-
-```python
-from tapa import TAPAPipeline
-
-pipeline = TAPAPipeline()
-
-# Process all audio files in a directory
-results = pipeline.run_batch(audio_dir="recordings/", results_dir="output/")
-
-# results is a dict: {filename: result_dict}
-for filename, result in results.items():
-    n_speakers = len(set(s["speaker"] for s in result["diarization"]))
-    print(f"{filename}: {n_speakers} speakers")
+# Or with standalone functions
+models = load_models(config=cfg)
+segments = diarize("dialogue.wav", models=models)
 ```
 
 ## Output Files
@@ -228,22 +272,28 @@ for speaker, vowels in results["vowel_data"].items():
 
 ## API Reference
 
+### Model loading
+
+| Function | Description |
+|----------|-------------|
+| `load_models(config=None)` | Load all models once, returns `Models` cache. Prints device (CUDA/CPU). |
+
 ### Convenience functions
 
-All importable directly from `tapa`:
+All importable directly from `tapa`. Every function accepts an optional `models=` parameter for model reuse across calls.
 
 | Function | Description | Returns |
 |----------|-------------|---------|
-| `diarize(audio_path, num_speakers=None)` | Speaker diarization | `[{"speaker", "start", "end"}]` |
-| `transcribe(audio_path, model_name="small.en")` | Whisper transcription | `[{"word", "start", "end"}]` |
-| `align(audio_path, words)` | Forced phoneme alignment | `[{"phone", "start", "end"}]` |
-| `extract_formants(audio_path, segments=None)` | Vowel F1/F2/pitch | `{speaker: {vowel: [measurements]}}` |
-| `extract_consonants(audio_path, segments=None)` | Stop VOT + fricative spectra | `(stop_data, fricative_data)` |
+| `diarize(audio_path, num_speakers=None, models=None)` | Speaker diarization | `[{"speaker", "start", "end"}]` |
+| `transcribe(audio_path, model_name=None, models=None)` | Whisper transcription | `[{"word", "start", "end"}]` |
+| `align(audio_path, words, models=None)` | Forced phoneme alignment | `[{"phone", "start", "end"}]` |
+| `extract_formants(audio_path, segments=None, models=None)` | Vowel F1/F2/pitch | `{speaker: {vowel: [measurements]}}` |
+| `extract_consonants(audio_path, segments=None, models=None)` | Stop VOT + fricative spectra | `(stop_data, fricative_data)` |
 | `compute_averages(vowel_data, stop_data, fricative_data)` | Per-speaker averages with outlier rejection | `{"vowel_averages", "stop_averages", "fricative_averages"}` |
 
 ### Pipeline class
 
-For running the full pipeline with model caching (recommended for batch processing):
+For running the full pipeline with automatic model caching:
 
 | Method | Description |
 |--------|-------------|

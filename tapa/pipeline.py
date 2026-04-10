@@ -62,6 +62,8 @@ class TAPAPipeline:
         if self._models_loaded:
             return
 
+        device_name = torch.cuda.get_device_name() if torch.cuda.is_available() else "CPU"
+        print(f"TAPA: Using device: {device_name} ({'CUDA' if self.device.type == 'cuda' else 'CPU'})")
         print("[1/4] Loading Silero VAD...")
         self.vad_model, self.get_speech_timestamps = load_silero_vad()
 

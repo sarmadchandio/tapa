@@ -117,7 +117,7 @@ def diarize(audio_path, num_speakers=None, config=None, models=None):
 
     cfg = config or (models.cfg if models else TAPAConfig())
     if num_speakers is not None:
-        cfg = TAPAConfig(**{**cfg.__dict__, "num_speakers": num_speakers})
+        cfg.num_speakers = num_speakers
 
     if models is None:
         models = Models(cfg)

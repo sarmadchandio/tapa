@@ -42,13 +42,14 @@ def identify_segments_from_mfa(phones, diarization_segments, cfg=None):
                 speaker_vowels[speaker].append({
                     "ipa": ipa, "arpabet": base,
                     "start": ph["start"], "end": ph["end"], "phone_raw": ph["phone"],
+                    "word": "",
                 })
 
         elif base in ARPABET_STOPS:
             if (ph["end"] - ph["start"]) >= cfg.min_stop_duration:
                 info = ARPABET_STOPS[base].copy()
                 info.update({"arpabet": base, "start": ph["start"], "end": ph["end"],
-                             "phone_raw": ph["phone"]})
+                             "phone_raw": ph["phone"], "word": ""})
                 if i + 1 < len(phones):
                     nxt = phones[i + 1]
                     info["following_phone"] = strip_stress(nxt["phone"])
@@ -62,7 +63,7 @@ def identify_segments_from_mfa(phones, diarization_segments, cfg=None):
             if (ph["end"] - ph["start"]) >= cfg.min_fricative_duration:
                 info = ARPABET_FRICATIVES[base].copy()
                 info.update({"arpabet": base, "start": ph["start"], "end": ph["end"],
-                             "phone_raw": ph["phone"]})
+                             "phone_raw": ph["phone"], "word": ""})
                 speaker_frics[speaker].append(info)
 
     return dict(speaker_vowels), dict(speaker_stops), dict(speaker_frics)

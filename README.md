@@ -1,38 +1,24 @@
 # TAPA - Text and Phonetic Analysis
 
-A Python pipeline for **speaker diarization** and **phonetic analysis** of audio recordings. Combines Whisper (transcription), Montreal Forced Aligner (phoneme alignment), and Praat (acoustic measurements) to extract detailed per-speaker phonetic data.
+A Python package for **speaker diarization** and **phonetic analysis** of audio recordings. Given an audio file, TAPA identifies who is speaking, transcribes what they say, and extracts detailed acoustic measurements per speaker.
 
 ## What it does
 
-Given an audio file, TAPA will:
-
-1. **Diarize** speakers using Silero VAD + Resemblyzer embeddings + hierarchical clustering
-2. **Transcribe** speech with word-level timestamps using OpenAI Whisper
-3. **Force-align** phonemes using Montreal Forced Aligner (or CMUdict fallback)
-4. **Measure vowel formants** (F1, F2, pitch) using Praat
-5. **Measure stop consonant VOT** (Voice Onset Time) using Praat
-6. **Measure fricative spectral moments** (Center of Gravity, spectral SD, skewness, kurtosis)
-7. **Compute per-speaker averages** with MAD outlier rejection
+1. **Speaker diarization** — identifies speakers and their time boundaries
+2. **Transcription** — word-level transcript with timestamps
+3. **Phoneme alignment** — precise phoneme boundaries (MFA or CMUdict fallback)
+4. **Vowel formants** — F1, F2, and pitch for each vowel token
+5. **Stop consonant VOT** — Voice Onset Time measurements
+6. **Fricative spectral moments** — Center of Gravity, spectral SD, skewness, kurtosis
+7. **Per-speaker averages** — summary statistics with outlier rejection
 
 ## Installation
-
-### From GitHub
 
 ```bash
 pip install git+https://github.com/sarmadchandio/tapa.git
 ```
 
-### From source
-
-```bash
-git clone https://github.com/sarmadchandio/tapa.git
-cd tapa
-pip install -e .
-```
-
-### System dependencies
-
-You need `ffmpeg` installed for audio decoding:
+Requires **Python 3.9+** and **ffmpeg**:
 
 ```bash
 # Ubuntu/Debian
@@ -42,22 +28,32 @@ sudo apt-get install ffmpeg
 brew install ffmpeg
 ```
 
+TAPA automatically uses **CUDA** if available (speeds up Whisper and speaker embeddings significantly). CPU works but is slower.
+
 ### Optional: Montreal Forced Aligner
 
-MFA provides precise phoneme boundaries. Without it, TAPA falls back to CMUdict proportional timing (less accurate but still functional).
+MFA gives precise phoneme boundaries. Without it, TAPA falls back to CMUdict proportional timing (less accurate but functional).
 
 ```bash
-# Install via conda
 conda install -c conda-forge montreal-forced-aligner
-
-# Download English models
 mfa model download acoustic english_us_arpa
 mfa model download dictionary english_us_arpa
 ```
 
 ## Quick Start
 
-### Full pipeline (all steps at once)
+```python
+from tapa import TAPAPipeline
+
+pipeline = TAPAPipeline()
+results = pipeline.run("interview.mp3")
+```
+
+That's it. Results are saved to `results/` and returned as a dict.
+
+## Usage
+
+### Run the full pipeline
 
 ```python
 from tapa import TAPAPipeline
@@ -65,7 +61,7 @@ from tapa import TAPAPipeline
 pipeline = TAPAPipeline()
 results = pipeline.run("interview.mp3")
 
-# Access results directly
+# Print per-speaker vowel formants
 for speaker, vowels in results["vowel_averages"].items():
     print(f"\n{speaker}:")
     for vowel, data in vowels.items():
@@ -74,160 +70,102 @@ for speaker, vowels in results["vowel_averages"].items():
 
 ### Use individual components
 
-Each step of the pipeline can be used independently:
+Each step can be used independently:
 
 ```python
 from tapa import diarize, transcribe, align, extract_formants, extract_consonants, compute_averages
 
-# 1. Just diarize — who is speaking when?
+# Just speaker diarization
 segments = diarize("interview.mp3")
-for seg in segments:
-    print(f"  {seg['speaker']}: {seg['start']:.1f}s - {seg['end']:.1f}s")
 
-# 2. Just transcribe — what are they saying?
+# Just transcription
 words = transcribe("interview.mp3")
-for w in words[:10]:
-    print(f"  {w['word']} ({w['start']:.2f}s - {w['end']:.2f}s)")
 
-# 3. Force-align phonemes (MFA or CMUdict fallback)
+# Just phoneme alignment
 phones = align("interview.mp3", words)
 
-# 4. Extract vowel formants (F1, F2, pitch)
-#    Pass segments from diarize() to get per-speaker results
+# Vowel formants (pass segments for per-speaker results, or omit for single-speaker)
 formants = extract_formants("interview.mp3", segments)
-for speaker, vowels in formants.items():
-    for vowel, measurements in vowels.items():
-        print(f"  {speaker} /{vowel}/: {len(measurements)} tokens")
 
-# 5. Extract consonant measurements (stop VOT + fricative spectral moments)
+# Stop VOT + fricative spectral moments
 stop_data, fricative_data = extract_consonants("interview.mp3", segments)
 
-# 6. Compute averages with outlier rejection
-avgs = compute_averages(
-    vowel_data=formants,
-    stop_data=stop_data,
-    fricative_data=fricative_data,
-)
+# Per-speaker averages with outlier rejection (pass any combination)
+avgs = compute_averages(vowel_data=formants, stop_data=stop_data, fricative_data=fricative_data)
 ```
 
 ### Processing multiple files
 
-When processing multiple files, use `load_models()` to load models once and reuse them.
-This avoids reloading Whisper, VAD, and Resemblyzer on every call:
+Use `load_models()` to load models once and reuse them across files. Without it, each function call reloads models from scratch.
 
 ```python
 from tapa import load_models, diarize, transcribe, extract_formants
 
-# Load all models once — prints device info (CUDA/CPU)
 models = load_models()
 # Output: TAPA: Using device: NVIDIA A100-SXM4-40GB (CUDA)
 #         Loading models...
 #         Models loaded.
 
-audio_files = ["interview1.mp3", "interview2.mp3", "podcast.wav"]
-for f in audio_files:
+for f in ["interview1.mp3", "interview2.mp3", "podcast.wav"]:
     segments = diarize(f, models=models)
     words = transcribe(f, models=models)
     formants = extract_formants(f, segments, models=models)
-    print(f"{f}: {len(segments)} segments, {len(words)} words")
 ```
 
-Without `models=`, each function loads its own models from scratch every call — fine for
-a single file, but slow if you're processing many.
-
-### Mix and match
-
-You can combine steps however you want:
-
-```python
-from tapa import load_models, diarize, transcribe, extract_formants
-
-models = load_models()
-
-# Diarize with known speaker count, then just get formants
-segments = diarize("podcast.mp3", num_speakers=3, models=models)
-formants = extract_formants("podcast.mp3", segments, models=models)
-
-# Transcribe without diarization
-words = transcribe("lecture.wav", models=models)
-
-# Extract formants treating entire audio as one speaker (no diarization)
-formants = extract_formants("single_speaker.wav", models=models)
-```
-
-### Full pipeline batch processing
-
-For running every step on a whole directory at once, use `TAPAPipeline`:
+Or use the pipeline class, which caches models automatically:
 
 ```python
 from tapa import TAPAPipeline
 
 pipeline = TAPAPipeline()
 
-# Process all audio files in a directory (models loaded once automatically)
+# Process all audio files in a directory
 results = pipeline.run_batch(audio_dir="recordings/", results_dir="output/")
 
-# results is a dict: {filename: result_dict}
-for filename, result in results.items():
-    n_speakers = len(set(s["speaker"] for s in result["diarization"]))
-    print(f"{filename}: {n_speakers} speakers")
+# Or specific files (models loaded once on first call)
+for f in ["file1.mp3", "file2.wav"]:
+    results = pipeline.run(f)
 ```
 
-Or run specific files through the full pipeline:
-
-```python
-pipeline = TAPAPipeline()
-for f in ["file1.mp3", "file2.wav", "file3.flac"]:
-    results = pipeline.run(f)  # models loaded once on first call
-```
-
-### Command line
-
-```bash
-# Process a single file
-tapa interview.mp3
-
-# Process multiple files with custom output directory
-tapa file1.mp3 file2.wav -o my_results/
-
-# Specify number of speakers and whisper model
-tapa podcast.mp3 --num-speakers 3 --whisper-model medium.en
-```
-
-### With custom configuration
-
-Configuration works with both the pipeline and standalone functions:
+### Custom configuration
 
 ```python
 from tapa import TAPAPipeline, TAPAConfig, load_models, diarize
 
 cfg = TAPAConfig(
-    num_speakers=2,              # Force 2-speaker detection
-    whisper_model="medium.en",   # Use larger Whisper model
-    target_vowels={"i", "u", "a"},  # Only analyze these vowels (IPA)
-    results_dir="my_output/",
-    mad_threshold=2.5,           # Looser outlier rejection
+    num_speakers=2,                 # Force 2-speaker detection (default: auto-detect)
+    whisper_model="medium.en",      # Larger Whisper model (default: small.en)
+    target_vowels={"i", "u", "a"}, # Only analyze these vowels in IPA (default: all)
+    mad_threshold=2.5,              # Looser outlier rejection (default: 2.0)
 )
 
-# With the full pipeline
+# Works with the pipeline
 pipeline = TAPAPipeline(config=cfg)
 results = pipeline.run("dialogue.wav")
 
-# Or with standalone functions
+# And with standalone functions
 models = load_models(config=cfg)
 segments = diarize("dialogue.wav", models=models)
 ```
 
+### Command line
+
+```bash
+tapa interview.mp3
+tapa file1.mp3 file2.wav -o my_results/
+tapa podcast.mp3 --num-speakers 3 --whisper-model medium.en
+```
+
 ## Output Files
 
-For each audio file (e.g., `interview.mp3`), TAPA produces:
+For each audio file (e.g., `interview.mp3`), TAPA saves to the results directory:
 
 | File | Description |
 |------|-------------|
 | `interview_diarization.csv` | Speaker segments (speaker, start, end) |
 | `interview_transcription.csv` | Word-level transcript with speaker labels |
 | `interview_transcription.txt` | Human-readable transcript |
-| `interview_aligned.TextGrid` | MFA phoneme alignment (Praat format) |
+| `interview_aligned.TextGrid` | MFA phoneme alignment (only if MFA is installed) |
 | `interview_vowel_formants.json` | Raw vowel F1/F2/pitch per token |
 | `interview_vowel_averages.csv` | Per-speaker per-vowel average formants |
 | `interview_stop_vot.json` | Raw stop VOT measurements per token |
@@ -235,23 +173,36 @@ For each audio file (e.g., `interview.mp3`), TAPA produces:
 | `interview_fricative_spectra.json` | Raw fricative spectral moments per token |
 | `interview_fricative_averages.csv` | Per-speaker per-fricative averages |
 
-## Working with results
+### Sample output
 
-### Load CSV results with pandas
+**Vowel averages CSV** (`interview_vowel_averages.csv`):
+
+```
+speaker,vowel,mean_f1,mean_f2,std_f1,std_f2,mean_pitch,n_tokens,n_after_filtering
+SPEAKER_00,i,393.0,2110.0,54.0,227.0,142.3,88,74
+SPEAKER_00,æ,656.0,1634.0,124.0,176.0,138.5,72,63
+SPEAKER_01,i,400.0,2418.0,41.0,196.0,198.7,903,805
+```
+
+**Stop averages CSV** (`interview_stop_averages.csv`):
+
+```
+speaker,phone,voicing,place,mean_vot_ms,std_vot_ms,mean_closure_ms,n_tokens,n_after_filtering
+SPEAKER_00,p,voiceless,bilabial,0.6,0.4,78.32,42,38
+SPEAKER_00,t,voiceless,alveolar,4.2,12.0,62.15,104,104
+```
+
+### Working with results in pandas
 
 ```python
 import pandas as pd
 
 vowels = pd.read_csv("results/interview_vowel_averages.csv")
-stops = pd.read_csv("results/interview_stop_averages.csv")
-fricatives = pd.read_csv("results/interview_fricative_averages.csv")
-
-# Filter to a specific speaker
 speaker_0 = vowels[vowels["speaker"] == "SPEAKER_00"]
 print(speaker_0[["vowel", "mean_f1", "mean_f2", "n_after_filtering"]])
 ```
 
-### Use results dict directly
+### Working with the results dict
 
 ```python
 results = pipeline.run("interview.mp3")
@@ -276,32 +227,30 @@ for speaker, vowels in results["vowel_data"].items():
 
 | Function | Description |
 |----------|-------------|
-| `load_models(config=None)` | Load all models once, returns `Models` cache. Prints device (CUDA/CPU). |
+| `load_models(config=None, whisper_model=None)` | Load all models once, returns `Models` cache. Prints device info. |
 
 ### Convenience functions
 
-All importable directly from `tapa`. Every function accepts an optional `models=` parameter for model reuse across calls.
+All importable from `tapa`. Every function accepts optional `config=` and `models=` parameters.
 
 | Function | Description | Returns |
 |----------|-------------|---------|
-| `diarize(audio_path, num_speakers=None, models=None)` | Speaker diarization | `[{"speaker", "start", "end"}]` |
-| `transcribe(audio_path, model_name=None, models=None)` | Whisper transcription | `[{"word", "start", "end"}]` |
-| `align(audio_path, words, models=None)` | Forced phoneme alignment | `[{"phone", "start", "end"}]` |
-| `extract_formants(audio_path, segments=None, models=None)` | Vowel F1/F2/pitch | `{speaker: {vowel: [measurements]}}` |
-| `extract_consonants(audio_path, segments=None, models=None)` | Stop VOT + fricative spectra | `(stop_data, fricative_data)` |
-| `compute_averages(vowel_data, stop_data, fricative_data)` | Per-speaker averages with outlier rejection | `{"vowel_averages", "stop_averages", "fricative_averages"}` |
+| `diarize(path, num_speakers=, config=, models=)` | Speaker diarization | `[{"speaker", "start", "end"}]` |
+| `transcribe(path, model_name=, config=, models=)` | Whisper transcription | `[{"word", "start", "end"}]` |
+| `align(path, words, config=, models=)` | Forced phoneme alignment | `[{"phone", "start", "end"}]` |
+| `extract_formants(path, segments=, config=, models=)` | Vowel F1/F2/pitch | `{speaker: {vowel: [measurements]}}` |
+| `extract_consonants(path, segments=, config=, models=)` | Stop VOT + fricative spectra | `(stop_data, fricative_data)` |
+| `compute_averages(vowel_data=, stop_data=, fricative_data=, config=)` | Averages with outlier rejection | `{"vowel_averages", "stop_averages", ...}` |
 
 ### Pipeline class
-
-For running the full pipeline with automatic model caching:
 
 | Method | Description |
 |--------|-------------|
 | `TAPAPipeline(config=None)` | Initialize with optional `TAPAConfig` |
-| `pipeline.run(audio_path)` | Process a single file, returns results dict |
-| `pipeline.run_batch(audio_dir)` | Process all audio files in a directory |
+| `pipeline.run(audio_path, results_dir=None)` | Process a single file, returns results dict |
+| `pipeline.run_batch(audio_dir=None, results_dir=None)` | Process all audio files in a directory |
 
-## Configuration Reference
+### Configuration
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -321,14 +270,7 @@ For running the full pipeline with automatic model caching:
 | `target_vowels` | `None` | Set of IPA vowels to analyze (`None` = all) |
 | `mfa_bin` | `None` | Path to MFA binary (`None` = auto-detect) |
 
-## GPU Support
-
-TAPA automatically uses CUDA if available. This significantly speeds up Whisper transcription and speaker embedding extraction.
-
-```python
-import torch
-print(f"CUDA available: {torch.cuda.is_available()}")
-```
+Supported audio formats: `.mp3`, `.wav`, `.flac`
 
 ## License
 

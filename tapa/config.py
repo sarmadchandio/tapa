@@ -1,6 +1,6 @@
 """Default configuration for the TAPA pipeline."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Set
 
 

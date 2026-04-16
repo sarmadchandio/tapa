@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TAPA — Trump vowel analysis across 2020 & 2024 debates</title>
+<style>
+ body{font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:1000px;margin:40px auto;padding:0 20px;color:#222;line-height:1.55}
+ h1{margin-bottom:4px}
+ .sub{color:#666;margin-top:0}
+ h2{margin-top:44px;border-bottom:1px solid #ddd;padding-bottom:6px}
+ img{width:100%;height:auto;border:1px solid #ddd;border-radius:6px;display:block;margin:12px 0}
+ code,.mono{font-family:Consolas,ui-monospace,monospace;background:#f4f4f4;padding:1px 5px;border-radius:3px}
+ table{border-collapse:collapse;font-family:Consolas,ui-monospace,monospace;font-size:13px;margin:10px 0}
+ th,td{border:1px solid #ddd;padding:4px 10px;text-align:right}
+ th{background:#f7f7f7}
+ td:first-child,th:first-child{text-align:left}
+ .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;margin-right:6px;color:#fff}
+ ul{padding-left:22px}
+</style>
+</head>
+<body>
+
+<h1>Trump's voice across debates — 2020 vs 2024</h1>
+<p class="sub">Acoustic analysis via TAPA (Whisper small.en + Silero VAD + Resemblyzer + Praat) · 30-min clips from each debate</p>
+<p>
+  <span class="pill" style="background:#1f77b4">2020 #1 Sep · vs Biden · 4742 tokens</span>
+  <span class="pill" style="background:#2ca02c">2020 #2 Oct · vs Biden · 3013 tokens</span>
+  <span class="pill" style="background:#ff7f0e">2024 Jun · vs Biden · 3706 tokens</span>
+  <span class="pill" style="background:#d62728">2024 Sep · vs Harris · 4743 tokens</span>
+</p>
+
+<h2>1 · Vowel space per debate</h2>
+<p>F1 (openness) × F2 (backness) scatter with IPA centroid labels. The overall vowel triangle shape is consistent across all four debates — the acoustic signature of the same speaker.</p>
+<img src="trump_vowel_space_per_debate.png">
+
+<h2>2 · Centroid overlay across debates</h2>
+<p>All four debates overlaid. Circles = 2020 #1, squares = 2020 #2, diamonds = 2024 Biden, triangles = 2024 Harris. Error bars show ± 1 SD.
+   The 2024 Harris debate (red triangles) shows noticeably <strong>higher F1 values</strong> across almost every vowel — the vowel space has shifted downward (more open articulation).</p>
+<img src="trump_centroids_across_debates.png">
+
+<h2>3 · Pitch (F0) distribution</h2>
+<p>Median pitch rises from <strong>152 Hz</strong> (2020 #1) to <strong>160 Hz</strong> (2024 debates) — an 8 Hz increase over 4 years.
+   The 2020 #1 distribution (blue) is the most peaked/concentrated; the 2024 Harris debate (red) has a broader, higher tail — more pitch variation and higher overall register.</p>
+<img src="trump_pitch_across_debates.png">
+
+<h2>4 · F1 and F2 by vowel</h2>
+<p>Bar charts with error bars. <strong>F1</strong>: the 2024 Harris debate (red) is consistently the highest across all vowels — Trump's articulation was more open in that debate.
+   <strong>F2</strong>: the 2024 Biden debate (orange) shows elevated F2 across the board — fronted vowel space.
+   The two 2020 debates (blue, green) are more similar to each other than to either 2024 debate.</p>
+<img src="trump_f1_f2_bars.png">
+
+<h2>5 · Token counts</h2>
+<p>Consistent proportional distribution across debates — ʌ dominates (unstressed centrals), ʊ is rare. 2020 #1 and 2024 Harris had the most tokens (Trump talked the most).</p>
+<img src="trump_vowel_counts_per_debate.png">
+
+<h2>6 · Pitch summary</h2>
+<table>
+<tr><th>Debate</th><th>Median F0</th><th>Mean F0</th><th>Vowel tokens with pitch</th></tr>
+<tr><td>2020 #1 (Sep, vs Biden)</td><td>152 Hz</td><td>160 Hz</td><td>2755</td></tr>
+<tr><td>2020 #2 (Oct, vs Biden)</td><td>159 Hz</td><td>166 Hz</td><td>1817</td></tr>
+<tr><td>2024 (Jun, vs Biden)</td><td>160 Hz</td><td>166 Hz</td><td>2214</td></tr>
+<tr><td>2024 (Sep, vs Harris)</td><td>160 Hz</td><td>170 Hz</td><td>2640</td></tr>
+</table>
+
+<h2>7 · F1/F2 summary table</h2>
+<table>
+<tr><th>Vowel</th><th colspan=2>2020 #1</th><th colspan=2>2020 #2</th><th colspan=2>2024 Biden</th><th colspan=2>2024 Harris</th></tr>
+<tr><th></th><th>F1</th><th>F2</th><th>F1</th><th>F2</th><th>F1</th><th>F2</th><th>F1</th><th>F2</th></tr>
+<tr><td>i</td><td>414</td><td>1817</td><td>431</td><td>1832</td><td>369</td><td>1995</td><td>462</td><td>1834</td></tr>
+<tr><td>ɪ</td><td>462</td><td>1655</td><td>488</td><td>1714</td><td>412</td><td>1883</td><td>531</td><td>1717</td></tr>
+<tr><td>ɛ</td><td>522</td><td>1651</td><td>535</td><td>1718</td><td>461</td><td>1884</td><td>581</td><td>1738</td></tr>
+<tr><td>æ</td><td>538</td><td>1683</td><td>565</td><td>1742</td><td>502</td><td>1925</td><td>603</td><td>1721</td></tr>
+<tr><td>ʌ</td><td>476</td><td>1589</td><td>514</td><td>1618</td><td>452</td><td>1792</td><td>567</td><td>1662</td></tr>
+<tr><td>ɑ</td><td>562</td><td>1486</td><td>561</td><td>1516</td><td>484</td><td>1572</td><td>640</td><td>1489</td></tr>
+<tr><td>ɔ</td><td>595</td><td>1550</td><td>567</td><td>1477</td><td>482</td><td>1520</td><td>657</td><td>1480</td></tr>
+<tr><td>ʊ</td><td>505</td><td>1531</td><td>475</td><td>1529</td><td>456</td><td>1556</td><td>490</td><td>1451</td></tr>
+<tr><td>u</td><td>412</td><td>1640</td><td>419</td><td>1638</td><td>399</td><td>1885</td><td>488</td><td>1746</td></tr>
+</table>
+
+<h2>8 · Observations</h2>
+<ul>
+ <li><strong>Pitch rose ~8 Hz from 2020→2024</strong> (152→160 median). Small but consistent. Could reflect aging, stress, or speaking style shift.</li>
+ <li><strong>2024 Harris debate had the most open vowels</strong> — F1 is highest across nearly every vowel. Could indicate more emphatic articulation or louder speech in a more adversarial debate.</li>
+ <li><strong>2024 Biden debate is an outlier on F2</strong> — systematically higher (fronted). This may be a recording/room acoustic artifact or a different speaking style in a less combative format.</li>
+ <li><strong>2020 debates cluster together</strong> — more internally consistent than either 2024 debate. Same year, same opponent, similar setting.</li>
+ <li><strong>Vowel triangle shape is stable</strong> — the relative positions (i high-front, ɑ low-back, u high-back) are preserved across all 4 debates. It's the same speaker.</li>
+ <li><strong>Caveat: CMUdict proportional timing</strong> adds noise. MFA alignment would tighten all clusters and likely sharpen the cross-debate differences.</li>
+</ul>
+
+<p style="color:#888;font-size:13px;margin-top:50px">
+Generated by <span class="mono">analyze_debates.py</span> from TAPA pipeline outputs.
+</p>
+</body>
+</html>

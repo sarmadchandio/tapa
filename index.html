@@ -96,6 +96,7 @@
         <li><a href="#sec-stops" data-tab="s3-3b">3b. VOT × Place × Voicing</a></li>
         <li><a href="#sec-stops" data-tab="s3-3c">3c. Speaker Comparison</a></li>
         <li><a href="#sec-stops" data-tab="s3-3d">3d. TAPA vs Dr.VOT</a></li>
+        <li><a href="#sec-stops" data-tab="s3-3e">3e. MFA-TAPA vs Dr.VOT</a></li>
       </ul>
     </li>
     <li><a href="#sec-frics">§4  Fricatives</a>
@@ -287,6 +288,7 @@
 <button class="tab-btn" data-target="s3-3b">3b. VOT by Place × Voicing</button>
 <button class="tab-btn" data-target="s3-3c">3c. VOT Speaker Comparison</button>
 <button class="tab-btn" data-target="s3-3d">3d. TAPA vs Dr.VOT</button>
+<button class="tab-btn" data-target="s3-3e">3e. MFA-TAPA vs Dr.VOT</button>
   </div>
   <div class="tab-panels">
     <div class="tab-panel active" id="s3-3a"><h4>2016 Oct — Trump vs Clinton</h4>
@@ -1152,6 +1154,127 @@
       <td>-12.4</td>
       <td>53.3</td>
       <td>0.2</td>
+      <td>2024 Sep — Trump vs Harris</td>
+    </tr>
+  </tbody>
+</table></div>
+<div class="tab-panel" id="s3-3e">
+<div class="note" style="margin-bottom:14px">
+  <strong>Does MFA alignment rescue TAPA's VOT?</strong> Tab 3d showed that TAPA's
+  CMUdict-timed VOT clusters near 0 ms and disagrees with Dr.VOT. This tab re-runs
+  the <em>same</em> TAPA VOT algorithm (Praat intensity peak for burst + pitch
+  tracker for voicing onset) but with Montreal Forced Aligner phone boundaries
+  instead of CMUdict proportional timing. If CMUdict coarseness were the problem,
+  MFA should bring TAPA into agreement with Dr.VOT.<br><br>
+  <strong>Finding:</strong> MFA boundaries don't rescue TAPA. "MFA-TAPA" VOT still
+  clusters at ~0 ms, and the correlation with Dr.VOT is essentially zero across
+  all phones. The underlying issue is the VOT algorithm, not the alignment —
+  Praat's pitch tracker finds voicing immediately at the stop-vowel boundary
+  regardless of how that boundary is placed, so VOT collapses to ~0 for every
+  clip. A burst-aware algorithm (or an end-to-end model like Dr.VOT) is required.
+</div>
+
+<h4>2016 Oct — Trump vs Clinton — scatter (MFA-TAPA vs Dr.VOT)</h4>
+<img src="2016_clinton_mfa_drvot_scatter.png" alt="scatter 2016_clinton">
+<h4>2016 Oct — Trump vs Clinton — grouped boxplots</h4>
+<img src="2016_clinton_mfa_drvot_by_phone.png" alt="by phone 2016_clinton">
+<h4>2016 Oct — Trump vs Clinton — Bland–Altman</h4>
+<img src="2016_clinton_mfa_drvot_bland_altman.png" alt="BA 2016_clinton">
+<h4>2020 #1 Sep — Trump vs Biden — scatter (MFA-TAPA vs Dr.VOT)</h4>
+<img src="2020_debate1_mfa_drvot_scatter.png" alt="scatter 2020_debate1">
+<h4>2020 #1 Sep — Trump vs Biden — grouped boxplots</h4>
+<img src="2020_debate1_mfa_drvot_by_phone.png" alt="by phone 2020_debate1">
+<h4>2020 #1 Sep — Trump vs Biden — Bland–Altman</h4>
+<img src="2020_debate1_mfa_drvot_bland_altman.png" alt="BA 2020_debate1">
+<h4>2024 Sep — Trump vs Harris — scatter (MFA-TAPA vs Dr.VOT)</h4>
+<img src="2024_harris_mfa_drvot_scatter.png" alt="scatter 2024_harris">
+<h4>2024 Sep — Trump vs Harris — grouped boxplots</h4>
+<img src="2024_harris_mfa_drvot_by_phone.png" alt="by phone 2024_harris">
+<h4>2024 Sep — Trump vs Harris — Bland–Altman</h4>
+<img src="2024_harris_mfa_drvot_bland_altman.png" alt="BA 2024_harris">
+<h4>Per-phone summary (MFA-TAPA vs Dr.VOT, all 3 debates)</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>phone_ipa</th>
+      <th>n</th>
+      <th>mfa_mean</th>
+      <th>drvot_mean</th>
+      <th>diff_mean</th>
+      <th>MAE</th>
+      <th>correlation</th>
+      <th>debate</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>d</td>
+      <td>11</td>
+      <td>0.5</td>
+      <td>-33.8</td>
+      <td>-34.3</td>
+      <td>38.5</td>
+      <td>-0.2</td>
+      <td>2016 Oct — Trump vs Clinton</td>
+    </tr>
+    <tr>
+      <td>g</td>
+      <td>32</td>
+      <td>1.0</td>
+      <td>-30.2</td>
+      <td>-31.2</td>
+      <td>41.7</td>
+      <td>0.2</td>
+      <td>2016 Oct — Trump vs Clinton</td>
+    </tr>
+    <tr>
+      <td>b</td>
+      <td>1</td>
+      <td>0.0</td>
+      <td>-5.0</td>
+      <td>-5.0</td>
+      <td>5.0</td>
+      <td>NaN</td>
+      <td>2020 #1 Sep — Trump vs Biden</td>
+    </tr>
+    <tr>
+      <td>g</td>
+      <td>59</td>
+      <td>0.5</td>
+      <td>-35.5</td>
+      <td>-36.0</td>
+      <td>38.3</td>
+      <td>-0.2</td>
+      <td>2020 #1 Sep — Trump vs Biden</td>
+    </tr>
+    <tr>
+      <td>t</td>
+      <td>3</td>
+      <td>0.2</td>
+      <td>13.0</td>
+      <td>12.8</td>
+      <td>19.5</td>
+      <td>1.0</td>
+      <td>2020 #1 Sep — Trump vs Biden</td>
+    </tr>
+    <tr>
+      <td>p</td>
+      <td>1</td>
+      <td>0.0</td>
+      <td>-20.0</td>
+      <td>-20.0</td>
+      <td>20.0</td>
+      <td>NaN</td>
+      <td>2024 Sep — Trump vs Harris</td>
+    </tr>
+    <tr>
+      <td>t</td>
+      <td>24</td>
+      <td>5.6</td>
+      <td>21.0</td>
+      <td>15.4</td>
+      <td>42.9</td>
+      <td>0.3</td>
       <td>2024 Sep — Trump vs Harris</td>
     </tr>
   </tbody>

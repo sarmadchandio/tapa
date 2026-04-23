@@ -1,0 +1,2217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TAPA — T4 · Wide Editorial</title>
+<style>
+ *{box-sizing:border-box}
+ body{margin:0}
+ .switch{position:sticky;top:0;background:#111;color:#eee;padding:6px 14px;font-size:12px;
+         font-family:-apple-system,"Segoe UI",Helvetica,sans-serif;z-index:100;
+         display:flex;gap:12px;align-items:center;border-bottom:1px solid #333}
+ .switch a{color:#aaa;text-decoration:none;padding:2px 6px;border-radius:3px}
+ .switch a:hover{color:white;background:#333}
+ .switch a.active{color:white;background:#333}
+ .switch .sep{color:#555}
+
+ body{font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+      max-width:1080px;margin:48px auto;padding:0 28px;color:#222;line-height:1.65;font-size:15px}
+ header{margin-bottom:36px}
+ h1{font-size:32px;margin:0 0 10px;font-weight:800;letter-spacing:-0.02em}
+ h2{margin-top:56px;font-size:24px;font-weight:700;color:#111;border-bottom:3px solid #111;padding-bottom:8px;display:inline-block}
+ h3{font-size:17px;margin-top:28px}
+ h4{font-size:13px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:#666;margin:22px 0 8px}
+ img{display:block;max-width:760px;width:100%;margin:12px auto 20px;border:1px solid #ddd}
+ table.data{max-width:760px;margin:12px auto 20px;border-collapse:collapse;font-size:12px;
+            font-family:Consolas,ui-monospace,monospace}
+ table.data th,table.data td{border-bottom:1px solid #eee;padding:6px 10px;text-align:right}
+ table.data th{background:transparent;text-align:left;font-weight:700;border-bottom:2px solid #111}
+ table.data td:first-child,table.data th:first-child{text-align:left}
+ .tabset{margin-top:18px;border-top:2px solid #111}
+ .tab-bar{display:flex;gap:2px;margin-bottom:14px;overflow-x:auto}
+ .tab-btn{background:transparent;border:none;padding:10px 16px;cursor:pointer;font-size:13px;
+          font-weight:600;color:#999;border-bottom:2px solid transparent;margin-top:-2px}
+ .tab-btn:hover{color:#333} .tab-btn.active{color:#111;border-bottom-color:#111}
+ .tab-panels{padding:10px 0} .tab-panel{display:none} .tab-panel.active{display:block}
+ nav.toc{border-top:1px solid #ccc;border-bottom:1px solid #ccc;padding:14px 0;margin:22px 0 32px;
+         font-size:13px} nav.toc ul{margin:0;padding-left:20px;list-style:none}
+ nav.toc li{display:inline-block;margin-right:18px} nav.toc h3{margin:0 0 8px;font-size:11px;color:#666}
+ nav.toc a{color:#111;text-decoration:none;font-weight:500}
+ .note{background:white;border-left:4px solid #111;padding:10px 18px;font-size:13px;color:#444;margin:14px 0}
+ code{font-family:Consolas,ui-monospace,monospace;background:#f5f5f5;padding:1px 5px;font-size:12px}
+
+</style>
+</head>
+<body>
+
+<div class="switch">
+  <span>Theme:</span>
+  <a href="t1_compact.html" class="">T1</a>
+  <a href="t2_card.html" class="">T2</a>
+  <a href="t3_dense.html" class="">T3</a>
+  <a href="t4_editorial.html" class="active">T4</a>
+  <a href="t5_paper.html" class="">T5</a>
+  <span class="sep">·</span>
+  <a href="picker.html">↺ picker</a>
+</div>
+
+<div class="layout">
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ul>
+    <li><a href="#sec-vowels">§2  Vowel Spaces</a>
+      <ul>
+        <li><a href="#sec-vowels" data-tab="s2-2a">2a. Full Vowel Space</a></li>
+        <li><a href="#sec-vowels" data-tab="s2-2b">2b. Token Counts</a></li>
+        <li><a href="#sec-vowels" data-tab="s2-2c">2c. Scatter + Ellipses</a></li>
+      </ul>
+    </li>
+    <li><a href="#sec-stops">§3  Stop VOT</a>
+      <ul>
+        <li><a href="#sec-stops" data-tab="s3-3a">3a. Summary</a></li>
+        <li><a href="#sec-stops" data-tab="s3-3b">3b. VOT × Place × Voicing</a></li>
+        <li><a href="#sec-stops" data-tab="s3-3c">3c. Speaker Comparison</a></li>
+      </ul>
+    </li>
+    <li><a href="#sec-frics">§4  Fricatives</a>
+      <ul>
+        <li><a href="#sec-frics" data-tab="s4-4a">4a. Summary</a></li>
+        <li><a href="#sec-frics" data-tab="s4-4b">4b. CoG Boxplots</a></li>
+        <li><a href="#sec-frics" data-tab="s4-4c">4c. CoG Comparison</a></li>
+        <li><a href="#sec-frics" data-tab="s4-4d">4d. 4 Spectral Moments</a></li>
+      </ul>
+    </li>
+    <li><a href="#sec-combined">§5  Combined</a></li>
+  </ul>
+</nav>
+
+<main class="content">
+<header>
+  <h1>TAPA — Case-Study Analysis across Presidential Debates</h1>
+  <p class="sub" style="color:#666;font-size:13px;margin:0">Pipeline: Whisper small.en word-timestamps + CMUdict proportional phone timing + Praat-parselmouth.
+  30-min clips, GPU-accelerated. Figures reproduced from <code>TAPA_v3_analysis.Rmd</code>.</p>
+</header>
+
+<div class="note">
+  <strong>Note.</strong> §1 (vowel validation) is skipped — hand-rated reference exists only for 2016.
+  Axis convention: F2 decreases left→right (front vowels on left); F1 increases top→bottom
+  (open vowels at bottom). Ellipses are 67% confidence.
+</div>
+<h2 id="sec-vowels">§2 · Case Study — Vowel Spaces</h2>
+
+<div class="tabset" data-section="s2">
+  <div class="tab-bar">
+    <button class="tab-btn active" data-target="s2-2a">2a. Full Vowel Space</button>
+<button class="tab-btn" data-target="s2-2b">2b. Token Counts</button>
+<button class="tab-btn" data-target="s2-2c">2c. Vowel Scatter with Ellipses</button>
+  </div>
+  <div class="tab-panels">
+    <div class="tab-panel active" id="s2-2a"><h4>2016 Oct — Trump vs Clinton</h4>
+<img src="2016_clinton_fig2_vowel_means.png" alt="vowel means 2016_clinton">
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<img src="2020_debate1_fig2_vowel_means.png" alt="vowel means 2020_debate1">
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<img src="2020_debate2_fig2_vowel_means.png" alt="vowel means 2020_debate2">
+<h4>2024 Jun — Trump vs Biden</h4>
+<img src="2024_biden_fig2_vowel_means.png" alt="vowel means 2024_biden">
+<h4>2024 Sep — Trump vs Harris</h4>
+<img src="2024_harris_fig2_vowel_means.png" alt="vowel means 2024_harris"></div>
+<div class="tab-panel" id="s2-2b"><h4>2016 Oct — Trump vs Clinton</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>n_vowel_categories</th>
+      <th>total_tokens</th>
+      <th>total_after_filter</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Clinton</td>
+      <td>15</td>
+      <td>3372</td>
+      <td>2839</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>15</td>
+      <td>2741</td>
+      <td>2232</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>n_vowel_categories</th>
+      <th>total_tokens</th>
+      <th>total_after_filter</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Biden</td>
+      <td>15</td>
+      <td>1845</td>
+      <td>1577</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>15</td>
+      <td>4742</td>
+      <td>4019</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>n_vowel_categories</th>
+      <th>total_tokens</th>
+      <th>total_after_filter</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Biden</td>
+      <td>15</td>
+      <td>2441</td>
+      <td>1926</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>15</td>
+      <td>3013</td>
+      <td>2484</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2024 Jun — Trump vs Biden</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>n_vowel_categories</th>
+      <th>total_tokens</th>
+      <th>total_after_filter</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Biden</td>
+      <td>14</td>
+      <td>2223</td>
+      <td>1688</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>15</td>
+      <td>3706</td>
+      <td>3051</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2024 Sep — Trump vs Harris</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>n_vowel_categories</th>
+      <th>total_tokens</th>
+      <th>total_after_filter</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Harris</td>
+      <td>15</td>
+      <td>2250</td>
+      <td>1813</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>15</td>
+      <td>4743</td>
+      <td>3918</td>
+    </tr>
+  </tbody>
+</table></div>
+<div class="tab-panel" id="s2-2c"><h4>2016 Oct — Trump vs Clinton</h4>
+<img src="2016_clinton_fig3_scatter_ellipses.png" alt="scatter 2016_clinton">
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<img src="2020_debate1_fig3_scatter_ellipses.png" alt="scatter 2020_debate1">
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<img src="2020_debate2_fig3_scatter_ellipses.png" alt="scatter 2020_debate2">
+<h4>2024 Jun — Trump vs Biden</h4>
+<img src="2024_biden_fig3_scatter_ellipses.png" alt="scatter 2024_biden">
+<h4>2024 Sep — Trump vs Harris</h4>
+<img src="2024_harris_fig3_scatter_ellipses.png" alt="scatter 2024_harris"></div>
+  </div>
+</div>
+
+<h2 id="sec-stops">§3 · Stop Consonant Analysis</h2>
+
+<div class="tabset" data-section="s3">
+  <div class="tab-bar">
+    <button class="tab-btn active" data-target="s3-3a">3a. Summary</button>
+<button class="tab-btn" data-target="s3-3b">3b. VOT by Place × Voicing</button>
+<button class="tab-btn" data-target="s3-3c">3c. VOT Speaker Comparison</button>
+  </div>
+  <div class="tab-panels">
+    <div class="tab-panel active" id="s3-3a"><h4>2016 Oct — Trump vs Clinton</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>phone</th>
+      <th>voicing</th>
+      <th>place</th>
+      <th>n</th>
+      <th>mean_VOT</th>
+      <th>sd_VOT</th>
+      <th>median_VOT</th>
+      <th>mean_closure_ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Clinton</td>
+      <td>d</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>115</td>
+      <td>3.41</td>
+      <td>10.46</td>
+      <td>0.5</td>
+      <td>70.09</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>b</td>
+      <td>voiced</td>
+      <td>bilabial</td>
+      <td>130</td>
+      <td>3.09</td>
+      <td>12.14</td>
+      <td>0.5</td>
+      <td>74.67</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>g</td>
+      <td>voiced</td>
+      <td>velar</td>
+      <td>70</td>
+      <td>1.25</td>
+      <td>2.83</td>
+      <td>0.5</td>
+      <td>72.20</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>t</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>217</td>
+      <td>5.15</td>
+      <td>13.92</td>
+      <td>0.5</td>
+      <td>97.16</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>p</td>
+      <td>voiceless</td>
+      <td>bilabial</td>
+      <td>78</td>
+      <td>3.94</td>
+      <td>8.52</td>
+      <td>0.5</td>
+      <td>76.99</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>k</td>
+      <td>voiceless</td>
+      <td>velar</td>
+      <td>102</td>
+      <td>3.41</td>
+      <td>7.81</td>
+      <td>0.5</td>
+      <td>79.53</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>d</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>89</td>
+      <td>0.92</td>
+      <td>2.28</td>
+      <td>0.5</td>
+      <td>65.44</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>b</td>
+      <td>voiced</td>
+      <td>bilabial</td>
+      <td>117</td>
+      <td>2.85</td>
+      <td>10.19</td>
+      <td>0.5</td>
+      <td>83.50</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>g</td>
+      <td>voiced</td>
+      <td>velar</td>
+      <td>62</td>
+      <td>0.88</td>
+      <td>1.93</td>
+      <td>0.5</td>
+      <td>66.18</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>t</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>161</td>
+      <td>4.88</td>
+      <td>14.02</td>
+      <td>0.5</td>
+      <td>78.83</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>p</td>
+      <td>voiceless</td>
+      <td>bilabial</td>
+      <td>68</td>
+      <td>4.51</td>
+      <td>8.24</td>
+      <td>0.5</td>
+      <td>68.21</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>k</td>
+      <td>voiceless</td>
+      <td>velar</td>
+      <td>66</td>
+      <td>2.86</td>
+      <td>6.02</td>
+      <td>0.5</td>
+      <td>67.70</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>phone</th>
+      <th>voicing</th>
+      <th>place</th>
+      <th>n</th>
+      <th>mean_VOT</th>
+      <th>sd_VOT</th>
+      <th>median_VOT</th>
+      <th>mean_closure_ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Biden</td>
+      <td>d</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>81</td>
+      <td>1.27</td>
+      <td>3.83</td>
+      <td>0.5</td>
+      <td>64.93</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>b</td>
+      <td>voiced</td>
+      <td>bilabial</td>
+      <td>80</td>
+      <td>1.84</td>
+      <td>6.93</td>
+      <td>0.5</td>
+      <td>79.37</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>g</td>
+      <td>voiced</td>
+      <td>velar</td>
+      <td>26</td>
+      <td>5.33</td>
+      <td>15.22</td>
+      <td>0.5</td>
+      <td>77.51</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>t</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>116</td>
+      <td>2.22</td>
+      <td>9.02</td>
+      <td>0.5</td>
+      <td>97.84</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>p</td>
+      <td>voiceless</td>
+      <td>bilabial</td>
+      <td>61</td>
+      <td>2.89</td>
+      <td>5.62</td>
+      <td>0.5</td>
+      <td>73.09</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>k</td>
+      <td>voiceless</td>
+      <td>velar</td>
+      <td>75</td>
+      <td>2.67</td>
+      <td>6.96</td>
+      <td>0.5</td>
+      <td>68.12</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>d</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>243</td>
+      <td>1.13</td>
+      <td>2.69</td>
+      <td>0.5</td>
+      <td>71.95</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>b</td>
+      <td>voiced</td>
+      <td>bilabial</td>
+      <td>179</td>
+      <td>1.53</td>
+      <td>4.67</td>
+      <td>0.5</td>
+      <td>78.24</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>g</td>
+      <td>voiced</td>
+      <td>velar</td>
+      <td>96</td>
+      <td>1.09</td>
+      <td>4.28</td>
+      <td>0.5</td>
+      <td>68.41</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>t</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>261</td>
+      <td>4.31</td>
+      <td>14.11</td>
+      <td>0.5</td>
+      <td>79.52</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>p</td>
+      <td>voiceless</td>
+      <td>bilabial</td>
+      <td>168</td>
+      <td>3.11</td>
+      <td>8.05</td>
+      <td>0.5</td>
+      <td>72.73</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>k</td>
+      <td>voiceless</td>
+      <td>velar</td>
+      <td>114</td>
+      <td>5.02</td>
+      <td>13.25</td>
+      <td>0.5</td>
+      <td>66.88</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>phone</th>
+      <th>voicing</th>
+      <th>place</th>
+      <th>n</th>
+      <th>mean_VOT</th>
+      <th>sd_VOT</th>
+      <th>median_VOT</th>
+      <th>mean_closure_ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Biden</td>
+      <td>d</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>117</td>
+      <td>1.00</td>
+      <td>2.63</td>
+      <td>0.5</td>
+      <td>70.45</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>b</td>
+      <td>voiced</td>
+      <td>bilabial</td>
+      <td>92</td>
+      <td>2.79</td>
+      <td>9.84</td>
+      <td>0.5</td>
+      <td>63.02</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>g</td>
+      <td>voiced</td>
+      <td>velar</td>
+      <td>39</td>
+      <td>1.44</td>
+      <td>2.95</td>
+      <td>0.5</td>
+      <td>71.53</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>t</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>179</td>
+      <td>4.88</td>
+      <td>13.50</td>
+      <td>0.5</td>
+      <td>79.35</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>p</td>
+      <td>voiceless</td>
+      <td>bilabial</td>
+      <td>75</td>
+      <td>2.91</td>
+      <td>7.47</td>
+      <td>0.5</td>
+      <td>72.57</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>k</td>
+      <td>voiceless</td>
+      <td>velar</td>
+      <td>65</td>
+      <td>4.78</td>
+      <td>11.13</td>
+      <td>0.5</td>
+      <td>66.75</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>d</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>134</td>
+      <td>1.07</td>
+      <td>3.00</td>
+      <td>0.5</td>
+      <td>69.48</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>b</td>
+      <td>voiced</td>
+      <td>bilabial</td>
+      <td>113</td>
+      <td>2.61</td>
+      <td>9.32</td>
+      <td>0.5</td>
+      <td>71.12</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>g</td>
+      <td>voiced</td>
+      <td>velar</td>
+      <td>51</td>
+      <td>5.73</td>
+      <td>21.96</td>
+      <td>0.5</td>
+      <td>73.48</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>t</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>197</td>
+      <td>3.09</td>
+      <td>8.55</td>
+      <td>0.5</td>
+      <td>75.83</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>p</td>
+      <td>voiceless</td>
+      <td>bilabial</td>
+      <td>100</td>
+      <td>3.16</td>
+      <td>7.25</td>
+      <td>0.5</td>
+      <td>68.76</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>k</td>
+      <td>voiceless</td>
+      <td>velar</td>
+      <td>82</td>
+      <td>5.12</td>
+      <td>10.42</td>
+      <td>0.5</td>
+      <td>73.88</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2024 Jun — Trump vs Biden</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>phone</th>
+      <th>voicing</th>
+      <th>place</th>
+      <th>n</th>
+      <th>mean_VOT</th>
+      <th>sd_VOT</th>
+      <th>median_VOT</th>
+      <th>mean_closure_ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Biden</td>
+      <td>d</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>105</td>
+      <td>1.56</td>
+      <td>5.92</td>
+      <td>0.5</td>
+      <td>73.34</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>b</td>
+      <td>voiced</td>
+      <td>bilabial</td>
+      <td>91</td>
+      <td>2.63</td>
+      <td>11.53</td>
+      <td>0.5</td>
+      <td>69.43</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>g</td>
+      <td>voiced</td>
+      <td>velar</td>
+      <td>28</td>
+      <td>0.55</td>
+      <td>0.31</td>
+      <td>0.5</td>
+      <td>63.83</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>t</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>139</td>
+      <td>3.05</td>
+      <td>10.10</td>
+      <td>0.5</td>
+      <td>73.50</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>p</td>
+      <td>voiceless</td>
+      <td>bilabial</td>
+      <td>57</td>
+      <td>1.63</td>
+      <td>5.65</td>
+      <td>0.5</td>
+      <td>65.06</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>k</td>
+      <td>voiceless</td>
+      <td>velar</td>
+      <td>81</td>
+      <td>5.12</td>
+      <td>12.38</td>
+      <td>0.5</td>
+      <td>57.24</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>d</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>180</td>
+      <td>0.94</td>
+      <td>2.75</td>
+      <td>0.5</td>
+      <td>65.05</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>b</td>
+      <td>voiced</td>
+      <td>bilabial</td>
+      <td>168</td>
+      <td>2.45</td>
+      <td>10.67</td>
+      <td>0.5</td>
+      <td>72.72</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>g</td>
+      <td>voiced</td>
+      <td>velar</td>
+      <td>67</td>
+      <td>0.75</td>
+      <td>1.66</td>
+      <td>0.5</td>
+      <td>64.19</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>t</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>211</td>
+      <td>2.30</td>
+      <td>9.06</td>
+      <td>0.5</td>
+      <td>73.00</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>p</td>
+      <td>voiceless</td>
+      <td>bilabial</td>
+      <td>129</td>
+      <td>1.96</td>
+      <td>5.32</td>
+      <td>0.5</td>
+      <td>63.66</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>k</td>
+      <td>voiceless</td>
+      <td>velar</td>
+      <td>127</td>
+      <td>4.24</td>
+      <td>14.17</td>
+      <td>0.5</td>
+      <td>66.07</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2024 Sep — Trump vs Harris</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>phone</th>
+      <th>voicing</th>
+      <th>place</th>
+      <th>n</th>
+      <th>mean_VOT</th>
+      <th>sd_VOT</th>
+      <th>median_VOT</th>
+      <th>mean_closure_ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Harris</td>
+      <td>d</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>102</td>
+      <td>2.80</td>
+      <td>9.96</td>
+      <td>0.5</td>
+      <td>73.74</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>b</td>
+      <td>voiced</td>
+      <td>bilabial</td>
+      <td>102</td>
+      <td>2.06</td>
+      <td>6.75</td>
+      <td>0.5</td>
+      <td>82.96</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>g</td>
+      <td>voiced</td>
+      <td>velar</td>
+      <td>14</td>
+      <td>1.29</td>
+      <td>2.51</td>
+      <td>0.5</td>
+      <td>79.38</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>t</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>128</td>
+      <td>6.84</td>
+      <td>15.61</td>
+      <td>0.5</td>
+      <td>91.46</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>p</td>
+      <td>voiceless</td>
+      <td>bilabial</td>
+      <td>44</td>
+      <td>2.11</td>
+      <td>5.68</td>
+      <td>0.5</td>
+      <td>76.91</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>k</td>
+      <td>voiceless</td>
+      <td>velar</td>
+      <td>71</td>
+      <td>2.44</td>
+      <td>7.08</td>
+      <td>0.5</td>
+      <td>71.10</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>d</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>231</td>
+      <td>1.56</td>
+      <td>5.39</td>
+      <td>0.5</td>
+      <td>62.47</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>b</td>
+      <td>voiced</td>
+      <td>bilabial</td>
+      <td>226</td>
+      <td>1.72</td>
+      <td>6.88</td>
+      <td>0.5</td>
+      <td>72.54</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>g</td>
+      <td>voiced</td>
+      <td>velar</td>
+      <td>96</td>
+      <td>2.04</td>
+      <td>11.48</td>
+      <td>0.5</td>
+      <td>65.65</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>t</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>296</td>
+      <td>4.26</td>
+      <td>12.49</td>
+      <td>0.5</td>
+      <td>75.18</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>p</td>
+      <td>voiceless</td>
+      <td>bilabial</td>
+      <td>130</td>
+      <td>2.90</td>
+      <td>6.43</td>
+      <td>0.5</td>
+      <td>65.46</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>k</td>
+      <td>voiceless</td>
+      <td>velar</td>
+      <td>155</td>
+      <td>5.07</td>
+      <td>12.10</td>
+      <td>0.5</td>
+      <td>67.57</td>
+    </tr>
+  </tbody>
+</table></div>
+<div class="tab-panel" id="s3-3b"><h4>2016 Oct — Trump vs Clinton</h4>
+<img src="2016_clinton_fig6A_vot_boxplot.png" alt="VOT boxplot 2016_clinton">
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<img src="2020_debate1_fig6A_vot_boxplot.png" alt="VOT boxplot 2020_debate1">
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<img src="2020_debate2_fig6A_vot_boxplot.png" alt="VOT boxplot 2020_debate2">
+<h4>2024 Jun — Trump vs Biden</h4>
+<img src="2024_biden_fig6A_vot_boxplot.png" alt="VOT boxplot 2024_biden">
+<h4>2024 Sep — Trump vs Harris</h4>
+<img src="2024_harris_fig6A_vot_boxplot.png" alt="VOT boxplot 2024_harris"></div>
+<div class="tab-panel" id="s3-3c"><h4>2016 Oct — Trump vs Clinton</h4>
+<img src="2016_clinton_fig6B_vot_comparison.png" alt="VOT comp 2016_clinton">
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<img src="2020_debate1_fig6B_vot_comparison.png" alt="VOT comp 2020_debate1">
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<img src="2020_debate2_fig6B_vot_comparison.png" alt="VOT comp 2020_debate2">
+<h4>2024 Jun — Trump vs Biden</h4>
+<img src="2024_biden_fig6B_vot_comparison.png" alt="VOT comp 2024_biden">
+<h4>2024 Sep — Trump vs Harris</h4>
+<img src="2024_harris_fig6B_vot_comparison.png" alt="VOT comp 2024_harris"></div>
+  </div>
+</div>
+
+<h2 id="sec-frics">§4 · Fricative Analysis</h2>
+
+<div class="tabset" data-section="s4">
+  <div class="tab-bar">
+    <button class="tab-btn active" data-target="s4-4a">4a. Summary</button>
+<button class="tab-btn" data-target="s4-4b">4b. CoG Boxplots</button>
+<button class="tab-btn" data-target="s4-4c">4c. CoG Speaker Comparison</button>
+<button class="tab-btn" data-target="s4-4d">4d. Four Spectral Moments</button>
+  </div>
+  <div class="tab-panels">
+    <div class="tab-panel active" id="s4-4a"><h4>2016 Oct — Trump vs Clinton</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>phone</th>
+      <th>voicing</th>
+      <th>place</th>
+      <th>n</th>
+      <th>mean_CoG</th>
+      <th>sd_CoG</th>
+      <th>mean_spec_SD</th>
+      <th>mean_skew</th>
+      <th>mean_kurt</th>
+      <th>mean_dur_ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Clinton</td>
+      <td>z</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>205</td>
+      <td>1530.0</td>
+      <td>1399.0</td>
+      <td>1193.0</td>
+      <td>2.27</td>
+      <td>13.15</td>
+      <td>86.6</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>ð</td>
+      <td>voiced</td>
+      <td>dental</td>
+      <td>170</td>
+      <td>1295.0</td>
+      <td>1312.0</td>
+      <td>1059.0</td>
+      <td>2.72</td>
+      <td>15.57</td>
+      <td>100.9</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>v</td>
+      <td>voiced</td>
+      <td>labiodental</td>
+      <td>120</td>
+      <td>1168.0</td>
+      <td>988.0</td>
+      <td>892.0</td>
+      <td>2.47</td>
+      <td>14.27</td>
+      <td>95.3</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>ʒ</td>
+      <td>voiced</td>
+      <td>postalveolar</td>
+      <td>3</td>
+      <td>541.0</td>
+      <td>32.0</td>
+      <td>534.0</td>
+      <td>3.93</td>
+      <td>22.38</td>
+      <td>63.8</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>s</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>398</td>
+      <td>2816.0</td>
+      <td>2283.0</td>
+      <td>1217.0</td>
+      <td>0.98</td>
+      <td>10.79</td>
+      <td>77.0</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>θ</td>
+      <td>voiceless</td>
+      <td>dental</td>
+      <td>35</td>
+      <td>1611.0</td>
+      <td>1401.0</td>
+      <td>1313.0</td>
+      <td>3.08</td>
+      <td>22.86</td>
+      <td>75.9</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>f</td>
+      <td>voiceless</td>
+      <td>labiodental</td>
+      <td>112</td>
+      <td>1919.0</td>
+      <td>1483.0</td>
+      <td>1347.0</td>
+      <td>1.91</td>
+      <td>9.24</td>
+      <td>90.5</td>
+    </tr>
+    <tr>
+      <td>Clinton</td>
+      <td>ʃ</td>
+      <td>voiceless</td>
+      <td>postalveolar</td>
+      <td>24</td>
+      <td>1610.0</td>
+      <td>1349.0</td>
+      <td>926.0</td>
+      <td>2.25</td>
+      <td>14.89</td>
+      <td>76.0</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>z</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>113</td>
+      <td>2161.0</td>
+      <td>1536.0</td>
+      <td>1606.0</td>
+      <td>1.52</td>
+      <td>7.41</td>
+      <td>86.5</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ð</td>
+      <td>voiced</td>
+      <td>dental</td>
+      <td>62</td>
+      <td>2055.0</td>
+      <td>1630.0</td>
+      <td>1552.0</td>
+      <td>1.99</td>
+      <td>9.47</td>
+      <td>115.2</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>v</td>
+      <td>voiced</td>
+      <td>labiodental</td>
+      <td>42</td>
+      <td>1269.0</td>
+      <td>1327.0</td>
+      <td>1046.0</td>
+      <td>3.53</td>
+      <td>26.76</td>
+      <td>81.4</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>s</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>236</td>
+      <td>2996.0</td>
+      <td>1794.0</td>
+      <td>1527.0</td>
+      <td>1.14</td>
+      <td>6.67</td>
+      <td>83.3</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>θ</td>
+      <td>voiceless</td>
+      <td>dental</td>
+      <td>24</td>
+      <td>1906.0</td>
+      <td>1868.0</td>
+      <td>1454.0</td>
+      <td>3.07</td>
+      <td>23.19</td>
+      <td>68.1</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>f</td>
+      <td>voiceless</td>
+      <td>labiodental</td>
+      <td>74</td>
+      <td>2478.0</td>
+      <td>1713.0</td>
+      <td>1622.0</td>
+      <td>1.95</td>
+      <td>13.95</td>
+      <td>77.0</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ʃ</td>
+      <td>voiceless</td>
+      <td>postalveolar</td>
+      <td>41</td>
+      <td>2694.0</td>
+      <td>1319.0</td>
+      <td>1430.0</td>
+      <td>1.29</td>
+      <td>5.15</td>
+      <td>76.9</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>phone</th>
+      <th>voicing</th>
+      <th>place</th>
+      <th>n</th>
+      <th>mean_CoG</th>
+      <th>sd_CoG</th>
+      <th>mean_spec_SD</th>
+      <th>mean_skew</th>
+      <th>mean_kurt</th>
+      <th>mean_dur_ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Biden</td>
+      <td>z</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>87</td>
+      <td>964.0</td>
+      <td>801.0</td>
+      <td>965.0</td>
+      <td>3.44</td>
+      <td>21.38</td>
+      <td>80.5</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>ð</td>
+      <td>voiced</td>
+      <td>dental</td>
+      <td>82</td>
+      <td>1123.0</td>
+      <td>1204.0</td>
+      <td>878.0</td>
+      <td>3.39</td>
+      <td>21.70</td>
+      <td>101.8</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>v</td>
+      <td>voiced</td>
+      <td>labiodental</td>
+      <td>61</td>
+      <td>798.0</td>
+      <td>428.0</td>
+      <td>647.0</td>
+      <td>3.64</td>
+      <td>27.55</td>
+      <td>110.1</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>s</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>212</td>
+      <td>1762.0</td>
+      <td>1561.0</td>
+      <td>1154.0</td>
+      <td>2.36</td>
+      <td>15.58</td>
+      <td>72.0</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>θ</td>
+      <td>voiceless</td>
+      <td>dental</td>
+      <td>12</td>
+      <td>1387.0</td>
+      <td>1092.0</td>
+      <td>1360.0</td>
+      <td>3.34</td>
+      <td>27.86</td>
+      <td>70.8</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>f</td>
+      <td>voiceless</td>
+      <td>labiodental</td>
+      <td>46</td>
+      <td>1915.0</td>
+      <td>1483.0</td>
+      <td>1642.0</td>
+      <td>2.17</td>
+      <td>11.25</td>
+      <td>82.9</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>ʃ</td>
+      <td>voiceless</td>
+      <td>postalveolar</td>
+      <td>23</td>
+      <td>1845.0</td>
+      <td>1511.0</td>
+      <td>1215.0</td>
+      <td>2.12</td>
+      <td>14.77</td>
+      <td>77.4</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>z</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>180</td>
+      <td>1592.0</td>
+      <td>1356.0</td>
+      <td>1381.0</td>
+      <td>2.30</td>
+      <td>13.20</td>
+      <td>89.1</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ð</td>
+      <td>voiced</td>
+      <td>dental</td>
+      <td>135</td>
+      <td>1482.0</td>
+      <td>1476.0</td>
+      <td>1177.0</td>
+      <td>2.70</td>
+      <td>15.69</td>
+      <td>107.8</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>v</td>
+      <td>voiced</td>
+      <td>labiodental</td>
+      <td>93</td>
+      <td>1048.0</td>
+      <td>1012.0</td>
+      <td>807.0</td>
+      <td>3.10</td>
+      <td>22.28</td>
+      <td>82.5</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>s</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>396</td>
+      <td>2970.0</td>
+      <td>1920.0</td>
+      <td>1412.0</td>
+      <td>1.12</td>
+      <td>7.89</td>
+      <td>72.3</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>θ</td>
+      <td>voiceless</td>
+      <td>dental</td>
+      <td>25</td>
+      <td>1474.0</td>
+      <td>1269.0</td>
+      <td>1536.0</td>
+      <td>2.66</td>
+      <td>13.97</td>
+      <td>65.8</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>f</td>
+      <td>voiceless</td>
+      <td>labiodental</td>
+      <td>107</td>
+      <td>2258.0</td>
+      <td>1633.0</td>
+      <td>1614.0</td>
+      <td>1.90</td>
+      <td>13.75</td>
+      <td>75.3</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ʃ</td>
+      <td>voiceless</td>
+      <td>postalveolar</td>
+      <td>77</td>
+      <td>2301.0</td>
+      <td>1462.0</td>
+      <td>1276.0</td>
+      <td>1.64</td>
+      <td>7.04</td>
+      <td>72.8</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>phone</th>
+      <th>voicing</th>
+      <th>place</th>
+      <th>n</th>
+      <th>mean_CoG</th>
+      <th>sd_CoG</th>
+      <th>mean_spec_SD</th>
+      <th>mean_skew</th>
+      <th>mean_kurt</th>
+      <th>mean_dur_ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Biden</td>
+      <td>z</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>156</td>
+      <td>1473.0</td>
+      <td>1285.0</td>
+      <td>1179.0</td>
+      <td>2.11</td>
+      <td>10.09</td>
+      <td>78.8</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>ð</td>
+      <td>voiced</td>
+      <td>dental</td>
+      <td>95</td>
+      <td>1531.0</td>
+      <td>1259.0</td>
+      <td>1182.0</td>
+      <td>2.03</td>
+      <td>11.22</td>
+      <td>97.9</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>v</td>
+      <td>voiced</td>
+      <td>labiodental</td>
+      <td>55</td>
+      <td>1120.0</td>
+      <td>1039.0</td>
+      <td>706.0</td>
+      <td>2.72</td>
+      <td>19.71</td>
+      <td>75.6</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>s</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>266</td>
+      <td>2511.0</td>
+      <td>1635.0</td>
+      <td>1236.0</td>
+      <td>1.18</td>
+      <td>7.06</td>
+      <td>74.6</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>θ</td>
+      <td>voiceless</td>
+      <td>dental</td>
+      <td>24</td>
+      <td>1260.0</td>
+      <td>1199.0</td>
+      <td>912.0</td>
+      <td>2.64</td>
+      <td>15.08</td>
+      <td>68.3</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>f</td>
+      <td>voiceless</td>
+      <td>labiodental</td>
+      <td>58</td>
+      <td>1950.0</td>
+      <td>1258.0</td>
+      <td>1620.0</td>
+      <td>1.87</td>
+      <td>10.17</td>
+      <td>73.1</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>ʃ</td>
+      <td>voiceless</td>
+      <td>postalveolar</td>
+      <td>40</td>
+      <td>2090.0</td>
+      <td>1253.0</td>
+      <td>940.0</td>
+      <td>1.64</td>
+      <td>9.53</td>
+      <td>74.4</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>z</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>155</td>
+      <td>1850.0</td>
+      <td>1446.0</td>
+      <td>1380.0</td>
+      <td>2.11</td>
+      <td>13.62</td>
+      <td>76.6</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ð</td>
+      <td>voiced</td>
+      <td>dental</td>
+      <td>76</td>
+      <td>1674.0</td>
+      <td>1387.0</td>
+      <td>1328.0</td>
+      <td>2.42</td>
+      <td>13.83</td>
+      <td>92.1</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>v</td>
+      <td>voiced</td>
+      <td>labiodental</td>
+      <td>83</td>
+      <td>990.0</td>
+      <td>846.0</td>
+      <td>898.0</td>
+      <td>3.69</td>
+      <td>30.86</td>
+      <td>73.2</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>s</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>289</td>
+      <td>2897.0</td>
+      <td>1770.0</td>
+      <td>1333.0</td>
+      <td>1.07</td>
+      <td>7.09</td>
+      <td>74.5</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>θ</td>
+      <td>voiceless</td>
+      <td>dental</td>
+      <td>29</td>
+      <td>1571.0</td>
+      <td>1237.0</td>
+      <td>1515.0</td>
+      <td>2.29</td>
+      <td>11.93</td>
+      <td>70.9</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>f</td>
+      <td>voiceless</td>
+      <td>labiodental</td>
+      <td>75</td>
+      <td>1777.0</td>
+      <td>1187.0</td>
+      <td>1511.0</td>
+      <td>2.24</td>
+      <td>13.56</td>
+      <td>75.7</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ʃ</td>
+      <td>voiceless</td>
+      <td>postalveolar</td>
+      <td>43</td>
+      <td>2141.0</td>
+      <td>1318.0</td>
+      <td>1136.0</td>
+      <td>1.63</td>
+      <td>6.15</td>
+      <td>68.6</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2024 Jun — Trump vs Biden</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>phone</th>
+      <th>voicing</th>
+      <th>place</th>
+      <th>n</th>
+      <th>mean_CoG</th>
+      <th>sd_CoG</th>
+      <th>mean_spec_SD</th>
+      <th>mean_skew</th>
+      <th>mean_kurt</th>
+      <th>mean_dur_ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Biden</td>
+      <td>z</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>33</td>
+      <td>2420.0</td>
+      <td>1516.0</td>
+      <td>1689.0</td>
+      <td>1.03</td>
+      <td>3.63</td>
+      <td>61.7</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>ð</td>
+      <td>voiced</td>
+      <td>dental</td>
+      <td>54</td>
+      <td>1784.0</td>
+      <td>1550.0</td>
+      <td>1514.0</td>
+      <td>1.64</td>
+      <td>5.71</td>
+      <td>99.6</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>v</td>
+      <td>voiced</td>
+      <td>labiodental</td>
+      <td>15</td>
+      <td>1606.0</td>
+      <td>1523.0</td>
+      <td>1205.0</td>
+      <td>2.18</td>
+      <td>11.08</td>
+      <td>79.6</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>ʒ</td>
+      <td>voiced</td>
+      <td>postalveolar</td>
+      <td>3</td>
+      <td>2796.0</td>
+      <td>953.0</td>
+      <td>2172.0</td>
+      <td>0.13</td>
+      <td>-1.03</td>
+      <td>43.3</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>s</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>154</td>
+      <td>3415.0</td>
+      <td>1763.0</td>
+      <td>1474.0</td>
+      <td>0.05</td>
+      <td>2.85</td>
+      <td>67.4</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>θ</td>
+      <td>voiceless</td>
+      <td>dental</td>
+      <td>11</td>
+      <td>1896.0</td>
+      <td>1472.0</td>
+      <td>1809.0</td>
+      <td>1.42</td>
+      <td>3.39</td>
+      <td>61.4</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>f</td>
+      <td>voiceless</td>
+      <td>labiodental</td>
+      <td>23</td>
+      <td>1458.0</td>
+      <td>936.0</td>
+      <td>1689.0</td>
+      <td>1.97</td>
+      <td>4.71</td>
+      <td>70.1</td>
+    </tr>
+    <tr>
+      <td>Biden</td>
+      <td>ʃ</td>
+      <td>voiceless</td>
+      <td>postalveolar</td>
+      <td>19</td>
+      <td>2516.0</td>
+      <td>1059.0</td>
+      <td>1288.0</td>
+      <td>0.97</td>
+      <td>1.86</td>
+      <td>75.0</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>z</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>117</td>
+      <td>2120.0</td>
+      <td>1601.0</td>
+      <td>1717.0</td>
+      <td>1.56</td>
+      <td>10.88</td>
+      <td>73.1</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ð</td>
+      <td>voiced</td>
+      <td>dental</td>
+      <td>62</td>
+      <td>1974.0</td>
+      <td>1890.0</td>
+      <td>1285.0</td>
+      <td>2.16</td>
+      <td>18.64</td>
+      <td>98.2</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>v</td>
+      <td>voiced</td>
+      <td>labiodental</td>
+      <td>40</td>
+      <td>918.0</td>
+      <td>901.0</td>
+      <td>788.0</td>
+      <td>4.11</td>
+      <td>40.69</td>
+      <td>78.2</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ʒ</td>
+      <td>voiced</td>
+      <td>postalveolar</td>
+      <td>3</td>
+      <td>1259.0</td>
+      <td>1020.0</td>
+      <td>1280.0</td>
+      <td>2.85</td>
+      <td>10.89</td>
+      <td>64.3</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>s</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>246</td>
+      <td>3461.0</td>
+      <td>1999.0</td>
+      <td>1393.0</td>
+      <td>0.51</td>
+      <td>10.28</td>
+      <td>73.2</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>θ</td>
+      <td>voiceless</td>
+      <td>dental</td>
+      <td>21</td>
+      <td>1356.0</td>
+      <td>1159.0</td>
+      <td>1468.0</td>
+      <td>2.24</td>
+      <td>11.35</td>
+      <td>72.7</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>f</td>
+      <td>voiceless</td>
+      <td>labiodental</td>
+      <td>64</td>
+      <td>2309.0</td>
+      <td>1697.0</td>
+      <td>1409.0</td>
+      <td>1.70</td>
+      <td>13.57</td>
+      <td>65.9</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ʃ</td>
+      <td>voiceless</td>
+      <td>postalveolar</td>
+      <td>34</td>
+      <td>2273.0</td>
+      <td>1460.0</td>
+      <td>1388.0</td>
+      <td>1.48</td>
+      <td>8.98</td>
+      <td>73.3</td>
+    </tr>
+  </tbody>
+</table>
+<h4>2024 Sep — Trump vs Harris</h4>
+<table class="dataframe data">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Speaker</th>
+      <th>phone</th>
+      <th>voicing</th>
+      <th>place</th>
+      <th>n</th>
+      <th>mean_CoG</th>
+      <th>sd_CoG</th>
+      <th>mean_spec_SD</th>
+      <th>mean_skew</th>
+      <th>mean_kurt</th>
+      <th>mean_dur_ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Harris</td>
+      <td>z</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>161</td>
+      <td>1150.0</td>
+      <td>978.0</td>
+      <td>1059.0</td>
+      <td>3.04</td>
+      <td>17.11</td>
+      <td>96.3</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>ð</td>
+      <td>voiced</td>
+      <td>dental</td>
+      <td>120</td>
+      <td>992.0</td>
+      <td>1032.0</td>
+      <td>876.0</td>
+      <td>3.61</td>
+      <td>24.78</td>
+      <td>97.6</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>v</td>
+      <td>voiced</td>
+      <td>labiodental</td>
+      <td>90</td>
+      <td>1071.0</td>
+      <td>935.0</td>
+      <td>754.0</td>
+      <td>3.00</td>
+      <td>19.18</td>
+      <td>96.9</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>ʒ</td>
+      <td>voiced</td>
+      <td>postalveolar</td>
+      <td>3</td>
+      <td>1161.0</td>
+      <td>816.0</td>
+      <td>1345.0</td>
+      <td>3.13</td>
+      <td>14.49</td>
+      <td>46.0</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>s</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>227</td>
+      <td>2535.0</td>
+      <td>2049.0</td>
+      <td>1358.0</td>
+      <td>1.40</td>
+      <td>11.86</td>
+      <td>84.4</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>θ</td>
+      <td>voiceless</td>
+      <td>dental</td>
+      <td>19</td>
+      <td>1025.0</td>
+      <td>522.0</td>
+      <td>1010.0</td>
+      <td>3.55</td>
+      <td>29.78</td>
+      <td>97.3</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>f</td>
+      <td>voiceless</td>
+      <td>labiodental</td>
+      <td>73</td>
+      <td>1755.0</td>
+      <td>1331.0</td>
+      <td>1284.0</td>
+      <td>2.00</td>
+      <td>10.15</td>
+      <td>88.9</td>
+    </tr>
+    <tr>
+      <td>Harris</td>
+      <td>ʃ</td>
+      <td>voiceless</td>
+      <td>postalveolar</td>
+      <td>44</td>
+      <td>1928.0</td>
+      <td>1332.0</td>
+      <td>1048.0</td>
+      <td>1.77</td>
+      <td>14.76</td>
+      <td>79.0</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>z</td>
+      <td>voiced</td>
+      <td>alveolar</td>
+      <td>292</td>
+      <td>1407.0</td>
+      <td>1276.0</td>
+      <td>1129.0</td>
+      <td>2.51</td>
+      <td>17.65</td>
+      <td>76.8</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ð</td>
+      <td>voiced</td>
+      <td>dental</td>
+      <td>259</td>
+      <td>1151.0</td>
+      <td>1148.0</td>
+      <td>964.0</td>
+      <td>3.15</td>
+      <td>25.07</td>
+      <td>89.4</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>v</td>
+      <td>voiced</td>
+      <td>labiodental</td>
+      <td>179</td>
+      <td>917.0</td>
+      <td>785.0</td>
+      <td>681.0</td>
+      <td>3.48</td>
+      <td>30.95</td>
+      <td>89.8</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ʒ</td>
+      <td>voiced</td>
+      <td>postalveolar</td>
+      <td>2</td>
+      <td>676.0</td>
+      <td>88.0</td>
+      <td>826.0</td>
+      <td>4.56</td>
+      <td>27.50</td>
+      <td>55.7</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>s</td>
+      <td>voiceless</td>
+      <td>alveolar</td>
+      <td>535</td>
+      <td>2601.0</td>
+      <td>1993.0</td>
+      <td>1177.0</td>
+      <td>1.36</td>
+      <td>13.07</td>
+      <td>71.4</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>θ</td>
+      <td>voiceless</td>
+      <td>dental</td>
+      <td>41</td>
+      <td>888.0</td>
+      <td>811.0</td>
+      <td>753.0</td>
+      <td>3.14</td>
+      <td>20.36</td>
+      <td>76.8</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>f</td>
+      <td>voiceless</td>
+      <td>labiodental</td>
+      <td>150</td>
+      <td>1614.0</td>
+      <td>1338.0</td>
+      <td>1189.0</td>
+      <td>2.34</td>
+      <td>17.28</td>
+      <td>79.4</td>
+    </tr>
+    <tr>
+      <td>Trump</td>
+      <td>ʃ</td>
+      <td>voiceless</td>
+      <td>postalveolar</td>
+      <td>110</td>
+      <td>1933.0</td>
+      <td>1460.0</td>
+      <td>1117.0</td>
+      <td>1.92</td>
+      <td>11.93</td>
+      <td>73.3</td>
+    </tr>
+  </tbody>
+</table></div>
+<div class="tab-panel" id="s4-4b"><h4>2016 Oct — Trump vs Clinton</h4>
+<img src="2016_clinton_fig7A_cog_boxplot.png" alt="CoG boxplot 2016_clinton">
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<img src="2020_debate1_fig7A_cog_boxplot.png" alt="CoG boxplot 2020_debate1">
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<img src="2020_debate2_fig7A_cog_boxplot.png" alt="CoG boxplot 2020_debate2">
+<h4>2024 Jun — Trump vs Biden</h4>
+<img src="2024_biden_fig7A_cog_boxplot.png" alt="CoG boxplot 2024_biden">
+<h4>2024 Sep — Trump vs Harris</h4>
+<img src="2024_harris_fig7A_cog_boxplot.png" alt="CoG boxplot 2024_harris"></div>
+<div class="tab-panel" id="s4-4c"><h4>2016 Oct — Trump vs Clinton</h4>
+<img src="2016_clinton_fig7B_cog_comparison.png" alt="CoG comp 2016_clinton">
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<img src="2020_debate1_fig7B_cog_comparison.png" alt="CoG comp 2020_debate1">
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<img src="2020_debate2_fig7B_cog_comparison.png" alt="CoG comp 2020_debate2">
+<h4>2024 Jun — Trump vs Biden</h4>
+<img src="2024_biden_fig7B_cog_comparison.png" alt="CoG comp 2024_biden">
+<h4>2024 Sep — Trump vs Harris</h4>
+<img src="2024_harris_fig7B_cog_comparison.png" alt="CoG comp 2024_harris"></div>
+<div class="tab-panel" id="s4-4d"><h4>2016 Oct — Trump vs Clinton</h4>
+<img src="2016_clinton_fig_4moments.png" alt="4 moments 2016_clinton">
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<img src="2020_debate1_fig_4moments.png" alt="4 moments 2020_debate1">
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<img src="2020_debate2_fig_4moments.png" alt="4 moments 2020_debate2">
+<h4>2024 Jun — Trump vs Biden</h4>
+<img src="2024_biden_fig_4moments.png" alt="4 moments 2024_biden">
+<h4>2024 Sep — Trump vs Harris</h4>
+<img src="2024_harris_fig_4moments.png" alt="4 moments 2024_harris"></div>
+  </div>
+</div>
+
+<h2 id="sec-combined">§5 · Combined Consonant Figure</h2>
+
+<div class="tabset" data-section="s5">
+  <div class="tab-bar">
+    <button class="tab-btn active" data-target="s5-5">All debates</button>
+  </div>
+  <div class="tab-panels">
+    <div class="tab-panel active" id="s5-5"><h4>2016 Oct — Trump vs Clinton</h4>
+<img src="2016_clinton_fig_combined.png" alt="combined 2016_clinton">
+<h4>2020 #1 Sep — Trump vs Biden</h4>
+<img src="2020_debate1_fig_combined.png" alt="combined 2020_debate1">
+<h4>2020 #2 Oct — Trump vs Biden</h4>
+<img src="2020_debate2_fig_combined.png" alt="combined 2020_debate2">
+<h4>2024 Jun — Trump vs Biden</h4>
+<img src="2024_biden_fig_combined.png" alt="combined 2024_biden">
+<h4>2024 Sep — Trump vs Harris</h4>
+<img src="2024_harris_fig_combined.png" alt="combined 2024_harris"></div>
+  </div>
+</div>
+
+<p style="color:#888;font-size:11px;margin:30px 0 20px;text-align:center;
+          border-top:1px solid #eee;padding-top:10px">
+Figures generated by <code>analyze_tapa_style.py</code> · TAPA pipeline · 30-min clips
+</p>
+</main><!-- /content -->
+</div><!-- /layout -->
+
+<script>
+document.querySelectorAll('.tabset').forEach(function(tabset) {
+  const btns   = tabset.querySelectorAll('.tab-btn');
+  const panels = tabset.querySelectorAll('.tab-panel');
+  btns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      btns.forEach(b => b.classList.remove('active'));
+      panels.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const target = btn.dataset.target;
+      tabset.querySelector('#' + target).classList.add('active');
+    });
+  });
+});
+// Sidebar sub-links — jump to section AND activate a specific tab
+document.querySelectorAll('.toc a[data-tab]').forEach(function(a){
+  a.addEventListener('click', function(){
+    const tabId = a.dataset.tab;
+    const panel = document.getElementById(tabId);
+    if (!panel) return;
+    const tabset = panel.closest('.tabset');
+    tabset.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    tabset.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    panel.classList.add('active');
+    const btn = tabset.querySelector('.tab-btn[data-target="'+tabId+'"]');
+    if (btn) btn.classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>

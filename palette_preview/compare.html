@@ -1,0 +1,57 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Ellipse color palettes</title>
+<style>
+ body{font-family:-apple-system,"Segoe UI",Helvetica,sans-serif;
+      max-width:1100px;margin:28px auto;padding:0 22px;color:#222;line-height:1.5}
+ h1{font-size:22px;margin:0 0 4px}
+ .sub{color:#666;font-size:13px;margin:0 0 24px}
+ .option{background:white;border:1px solid #ddd;border-radius:6px;padding:14px 18px;
+         margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+ h2{margin:0 0 4px;font-size:16px}
+ .desc{color:#666;font-size:13px;margin:0 0 8px}
+ img{width:100%;height:auto;display:block;border:1px solid #eee;border-radius:3px}
+ .swatch{display:inline-block;width:18px;height:18px;border-radius:3px;margin-right:3px;
+         vertical-align:middle;border:1px solid rgba(0,0,0,0.15)}
+ .swatches{margin:6px 0 10px}
+ .pick{margin-top:10px;font-size:12px;color:#1a73e8}
+</style></head><body>
+<h1>Ellipse color palettes — pick one</h1>
+<p class="sub">Same data (2016 Trump vs Clinton, scatter + 67% ellipses per vowel), rendered
+with 5 different palettes for the 10 monophthongs. Tell me which (P1–P5) to apply across
+all debates.</p>
+
+<div class="option">
+  <h2>P1 · tab10</h2>
+  <p class="desc">matplotlib classic — highly distinct, saturated primaries.</p>
+  <div class="swatches"><span class="swatch" style="background:#1f77b4" title="æ"></span><span class="swatch" style="background:#ff7f0e" title="ɛ"></span><span class="swatch" style="background:#2ca02c" title="ɪ"></span><span class="swatch" style="background:#d62728" title="i"></span><span class="swatch" style="background:#9467bd" title="ʊ"></span><span class="swatch" style="background:#8c564b" title="u"></span><span class="swatch" style="background:#e377c2" title="ɑ"></span><span class="swatch" style="background:#7f7f7f" title="ɔ"></span><span class="swatch" style="background:#bcbd22" title="ʌ"></span><span class="swatch" style="background:#17becf" title="ɝ"></span></div>
+  <img src="P1_tab10.png" alt="P1 · tab10">
+</div>
+
+<div class="option">
+  <h2>P2 · ColorBrewer Set1</h2>
+  <p class="desc">Bold ColorBrewer qualitative — red, blue, green, purple, orange...</p>
+  <div class="swatches"><span class="swatch" style="background:#e41a1c" title="æ"></span><span class="swatch" style="background:#377eb8" title="ɛ"></span><span class="swatch" style="background:#4daf4a" title="ɪ"></span><span class="swatch" style="background:#984ea3" title="i"></span><span class="swatch" style="background:#ff7f00" title="ʊ"></span><span class="swatch" style="background:#ffff33" title="u"></span><span class="swatch" style="background:#a65628" title="ɑ"></span><span class="swatch" style="background:#f781bf" title="ɔ"></span><span class="swatch" style="background:#999999" title="ʌ"></span><span class="swatch" style="background:#66c2a5" title="ɝ"></span></div>
+  <img src="P2_set1.png" alt="P2 · ColorBrewer Set1">
+</div>
+
+<div class="option">
+  <h2>P3 · Okabe–Ito</h2>
+  <p class="desc">8-color colorblind-safe palette (extended to 10). Stats/viz standard.</p>
+  <div class="swatches"><span class="swatch" style="background:#E69F00" title="æ"></span><span class="swatch" style="background:#56B4E9" title="ɛ"></span><span class="swatch" style="background:#009E73" title="ɪ"></span><span class="swatch" style="background:#F0E442" title="i"></span><span class="swatch" style="background:#0072B2" title="ʊ"></span><span class="swatch" style="background:#D55E00" title="u"></span><span class="swatch" style="background:#CC79A7" title="ɑ"></span><span class="swatch" style="background:#000000" title="ɔ"></span><span class="swatch" style="background:#999999" title="ʌ"></span><span class="swatch" style="background:#6A3D9A" title="ɝ"></span></div>
+  <img src="P3_okabe_ito.png" alt="P3 · Okabe–Ito">
+</div>
+
+<div class="option">
+  <h2>P4 · ColorBrewer Dark2</h2>
+  <p class="desc">Muted but distinct — good for scatter with overlap.</p>
+  <div class="swatches"><span class="swatch" style="background:#1b9e77" title="æ"></span><span class="swatch" style="background:#d95f02" title="ɛ"></span><span class="swatch" style="background:#7570b3" title="ɪ"></span><span class="swatch" style="background:#e7298a" title="i"></span><span class="swatch" style="background:#66a61e" title="ʊ"></span><span class="swatch" style="background:#e6ab02" title="u"></span><span class="swatch" style="background:#a6761d" title="ɑ"></span><span class="swatch" style="background:#666666" title="ɔ"></span><span class="swatch" style="background:#1f78b4" title="ʌ"></span><span class="swatch" style="background:#b2df8a" title="ɝ"></span></div>
+  <img src="P4_dark2.png" alt="P4 · ColorBrewer Dark2">
+</div>
+
+<div class="option">
+  <h2>P5 · Spectral</h2>
+  <p class="desc">Rainbow-ish (red→yellow→blue) — vowels ordered left→right suggests a scale.</p>
+  <div class="swatches"><span class="swatch" style="background:#b71d48" title="æ"></span><span class="swatch" style="background:#e45549" title="ɛ"></span><span class="swatch" style="background:#f88e52" title="ɪ"></span><span class="swatch" style="background:#fdc675" title="i"></span><span class="swatch" style="background:#feefa5" title="ʊ"></span><span class="swatch" style="background:#f2faab" title="u"></span><span class="swatch" style="background:#c7e89e" title="ɑ"></span><span class="swatch" style="background:#86cea4" title="ɔ"></span><span class="swatch" style="background:#4ba4b1" title="ʌ"></span><span class="swatch" style="background:#4969ae" title="ɝ"></span></div>
+  <img src="P5_spectral.png" alt="P5 · Spectral">
+</div>
+</body></html>

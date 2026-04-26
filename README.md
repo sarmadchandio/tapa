@@ -97,14 +97,16 @@ automatically fall back to TAPA-Praat so coverage never drops.
 **One-time setup (Colab):**
 
 ```python
-# 1. System deps Dr.VOT needs at runtime
+# 1. System deps Dr.VOT needs at runtime (apt — can't be folded into pip)
 !apt-get install -y -qq praat sox
 
-# 2. Slim Python deps (do NOT install Dr.VOT's full requirements.txt — it pins
-#    older torch/numpy that conflict with Colab's preinstalled stack)
-!pip install -q boltons tqdm pydub soundfile praatio textgrid noisereduce
+# 2. Install TAPA *with* the [drvot] extra in one line. Includes boltons,
+#    pydub, textgrid, noisereduce — the slim Python deps Dr.VOT needs at
+#    runtime. Do NOT install Dr.VOT's full requirements.txt — it pins older
+#    torch/numpy that conflict with Colab's preinstalled stack.
+!pip install -q "tapa[drvot] @ git+https://github.com/sarmadchandio/tapa.git"
 
-# 3. Clone + patch Dr.VOT (idempotent)
+# 3. Clone + patch Dr.VOT (idempotent — safe to re-run)
 !python -m tapa.drvot setup /content/Dr.VOT
 ```
 

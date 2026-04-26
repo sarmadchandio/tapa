@@ -42,6 +42,9 @@ dependencies = [
 
 [project.optional-dependencies]
 mfa = ["montreal-forced-aligner"]
+# Slim Python deps Dr.VOT needs at runtime (subprocess pipeline). Do NOT install
+# Dr.VOT's full requirements.txt — its pinned torch/numpy collide with TAPA's.
+drvot = ["boltons", "pydub", "textgrid", "noisereduce"]
 
 [project.urls]
 Homepage = "https://github.com/sarmadchandio/tapa"

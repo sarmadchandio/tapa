@@ -224,6 +224,9 @@ def _invoke_drvot(repo_dir: Path, raw_dir: Path, processed_dir: Path,
     all_files = raw_dir / "all_files"
     if all_files.exists():
         shutil.rmtree(all_files)
+    # Dr.VOT's prepare_wav_dir.py expects --output_dir to exist (it doesn't
+    # create it). Same for the other steps' working dirs above.
+    all_files.mkdir(parents=True)
 
     # Step 1: flatten raw wavs into all_files/ + write files.txt
     _run([python_bin, "process_data/prepare_wav_dir.py",

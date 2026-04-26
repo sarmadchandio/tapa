@@ -44,3 +44,11 @@ class TAPAConfig:
 
     # Whisper model
     whisper_model: str = "small.en"
+
+    # VOT backend: "tapa" (Praat-based) or "drvot" (Dr.VOT CNN, with TAPA fallback)
+    vot_backend: str = "tapa"
+    drvot_repo_dir: Optional[str] = None
+    drvot_python: Optional[str] = None  # None -> sys.executable
+    drvot_clip_pre_ms: float = 150.0    # padding before stop closure when cutting clips
+    drvot_clip_post_ms: float = 150.0   # padding after the following vowel
+    drvot_keep_temp: bool = False       # keep clip temp dir for debugging

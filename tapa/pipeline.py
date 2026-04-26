@@ -21,6 +21,7 @@ from .diarization import (
     load_silero_vad,
     save_diarization_csv,
 )
+from .drvot import extract_all_stop_measurements_drvot
 from .io import (
     save_fricative_averages_csv,
     save_json,
@@ -63,25 +64,30 @@ class TAPAPipeline:
             return
 
         device_name = torch.cuda.get_device_name() if torch.cuda.is_available() else "CPU"
-        print(f"TAPA: Using device: {device_name} ({'CUDA' if self.device.type == 'cuda' else 'CPU'})")
-        print("[1/4] Loading Silero VAD...")
+        print(f"[TAPA] Device: {device_name} ({'CUDA' if self.device.type == 'cuda' else 'CPU'})", flush=True)
+        print(f"[TAPA] VOT backend: {self.cfg.vot_backend}"
+              + (f"  (Dr.VOT repo: {self.cfg.drvot_repo_dir})"
+                 if self.cfg.vot_backend == "drvot" else ""), flush=True)
+        print("[TAPA 1/4] Loading Silero VAD...", flush=True)
         self.vad_model, self.get_speech_timestamps = load_silero_vad()
 
-        print("[2/4] Loading Resemblyzer...")
+        print("[TAPA 2/4] Loading Resemblyzer (speaker embeddings)...", flush=True)
         self.voice_encoder = VoiceEncoder()
 
-        print(f"[3/4] Loading Whisper ({self.cfg.whisper_model})...")
+        print(f"[TAPA 3/4] Loading Whisper ({self.cfg.whisper_model})...", flush=True)
         self.whisper_model = whisper.load_model(self.cfg.whisper_model, device=self.device)
 
-        print("[4/4] Checking MFA...")
+        print("[TAPA 4/4] Checking MFA...", flush=True)
         self.mfa_available = find_mfa_bin(self.cfg) is not None
-        print(f"    MFA: {'found' if self.mfa_available else 'not found (will use CMUdict fallback)'}")
+        print(f"    MFA: {'found (precise phoneme alignment)' if self.mfa_available else 'NOT found — using CMUdict proportional fallback'}",
+              flush=True)
 
         nltk.download("cmudict", quiet=True)
         from nltk.corpus import cmudict as _cmudict
         self.cmudict = _cmudict.dict()
 
         self._models_loaded = True
+        print("[TAPA] Models loaded.", flush=True)
 
     def run(self, audio_path, results_dir=None):
         """Run the full pipeline on a single audio file.
@@ -100,32 +106,32 @@ class TAPAPipeline:
         os.makedirs(results_dir, exist_ok=True)
         stem = Path(audio_path).stem
 
-        print(f"{'='*60}")
-        print(f"Processing: {Path(audio_path).name}")
-        print(f"{'='*60}")
+        print(f"{'='*60}", flush=True)
+        print(f"Processing: {Path(audio_path).name}", flush=True)
+        print(f"{'='*60}", flush=True)
 
         # Step 1: Diarization
-        print("  -> Diarizing...")
+        print("[STEP 1/6] Diarization (VAD + Resemblyzer clustering)...", flush=True)
         vad_segs, wav_t, wav_sr = get_speech_segments(
             audio_path, self.vad_model, self.get_speech_timestamps, self.cfg)
         wav_np = wav_t.numpy().astype(np.float32)
         segments = assign_speakers(vad_segs, wav_np, wav_sr, self.voice_encoder, self.cfg)
         speakers = set(s["speaker"] for s in segments)
-        print(f"    {len(segments)} segments -> {len(speakers)} speaker(s)")
+        print(f"          -> {len(segments)} segments / {len(speakers)} speaker(s)", flush=True)
         diar_path = os.path.join(results_dir, f"{stem}_diarization.csv")
         save_diarization_csv(segments, diar_path)
 
         # Step 2: Transcription
-        print("  -> Transcribing...")
+        print("[STEP 2/6] Transcription (Whisper)...", flush=True)
         words = transcribe_audio(audio_path, self.whisper_model)
-        print(f"    {len(words)} words")
+        print(f"          -> {len(words)} words", flush=True)
         trans_path = os.path.join(results_dir, f"{stem}_transcription.csv")
         save_transcription(words, segments, trans_path)
 
-        # Step 3: Forced alignment (MFA or CMUdict fallback)
+        # Step 3: Forced alignment (MFA primary, CMUdict fallback)
         tg_path = None
         if self.mfa_available:
-            print("  -> Running MFA forced alignment...")
+            print("[STEP 3/6] Forced alignment (PRIMARY: Montreal Forced Aligner)...", flush=True)
             mfa_in = os.path.join(self.cfg.mfa_temp_dir, stem)
             mfa_out = os.path.join(self.cfg.mfa_temp_dir, f"{stem}_aligned")
             prepare_mfa_input(audio_path, words, mfa_in, self.cfg)
@@ -133,40 +139,52 @@ class TAPAPipeline:
             if tg_path:
                 tg_dest = os.path.join(results_dir, f"{stem}_aligned.TextGrid")
                 shutil.copy2(tg_path, tg_dest)
-                print("    TextGrid saved")
+                print("          -> MFA TextGrid saved", flush=True)
+            else:
+                print("          -> MFA produced no TextGrid; using CMUdict fallback", flush=True)
+        else:
+            print("[STEP 3/6] Forced alignment (FALLBACK: CMUdict proportional, MFA unavailable)...",
+                  flush=True)
 
         # Step 4: Identify phoneme segments
+        print("[STEP 4/6] Identifying phoneme segments...", flush=True)
         if tg_path:
-            print("  -> Parsing MFA phoneme boundaries...")
             phones = parse_textgrid(tg_path)
-            print(f"    {len(phones)} phones")
+            print(f"          source: MFA  ({len(phones)} phones)", flush=True)
             sp_v, sp_s, sp_f = identify_segments_from_mfa(phones, segments, self.cfg)
         else:
-            print("  -> CMUdict proportional timing fallback...")
+            print("          source: CMUdict proportional timing", flush=True)
             sp_v, sp_s, sp_f = identify_segments_from_cmudict(words, segments, self.cmudict, self.cfg)
 
         nv = sum(len(v) for v in sp_v.values())
         ns = sum(len(v) for v in sp_s.values())
         nf = sum(len(v) for v in sp_f.values())
-        print(f"    {nv} vowels, {ns} stops, {nf} fricatives")
+        print(f"          -> {nv} vowels, {ns} stops, {nf} fricatives", flush=True)
 
         # Step 5: Acoustic measurements
-        print("  -> Loading audio for analysis...")
+        print("[STEP 5/6] Loading audio for acoustic analysis...", flush=True)
         audio_np, _ = librosa.load(audio_path, sr=self.cfg.sample_rate)
 
-        print("  -> Extracting vowel formants...")
+        print("[STEP 5a]  Vowel formants (TAPA / Praat)...", flush=True)
         vowel_data = extract_all_vowel_formants(sp_v, audio_np, self.cfg)
-        print("  -> Extracting stop VOT...")
-        stop_data = extract_all_stop_measurements(sp_s, audio_np, self.cfg)
-        print("  -> Extracting fricative spectral moments...")
+
+        if self.cfg.vot_backend == "drvot":
+            print("[STEP 5b]  Stop VOT (PRIMARY: Dr.VOT, FALLBACK per-token: TAPA / Praat)...",
+                  flush=True)
+            stop_data = extract_all_stop_measurements_drvot(sp_s, audio_np, self.cfg)
+        else:
+            print("[STEP 5b]  Stop VOT (TAPA / Praat)...", flush=True)
+            stop_data = extract_all_stop_measurements(sp_s, audio_np, self.cfg)
+
+        print("[STEP 5c]  Fricative spectral moments (TAPA / Praat)...", flush=True)
         fric_data = extract_all_fricative_measurements(sp_f, audio_np, self.cfg)
 
-        # Step 6: Compute averages
+        # Step 6: Compute averages + save
+        print("[STEP 6/6] Aggregating + saving results...", flush=True)
         v_avg = compute_vowel_averages(vowel_data, self.cfg)
         s_avg = compute_stop_averages(stop_data, self.cfg)
         f_avg = compute_fricative_averages(fric_data, self.cfg)
 
-        # Step 7: Save results
         save_json(vowel_data, os.path.join(results_dir, f"{stem}_vowel_formants.json"))
         save_vowel_averages_csv(v_avg, os.path.join(results_dir, f"{stem}_vowel_averages.csv"))
         save_json(stop_data, os.path.join(results_dir, f"{stem}_stop_vot.json"))
@@ -174,14 +192,15 @@ class TAPAPipeline:
         save_json(fric_data, os.path.join(results_dir, f"{stem}_fricative_spectra.json"))
         save_fricative_averages_csv(f_avg, os.path.join(results_dir, f"{stem}_fricative_averages.csv"))
 
-        # Print summary
-        method = "MFA" if tg_path else "CMUdict"
-        print(f"\n  Done ({method}):")
+        align_method = "MFA" if tg_path else "CMUdict"
+        vot_method = "Dr.VOT (+ TAPA fallback)" if self.cfg.vot_backend == "drvot" else "TAPA-Praat"
+        print(f"\n[DONE] {Path(audio_path).name}  "
+              f"alignment={align_method}, vot_backend={vot_method}", flush=True)
         for spk in sorted(v_avg.keys()):
             ntv = sum(d["n_tokens"] for d in v_avg[spk].values())
             nts = sum(d["n_tokens"] for d in s_avg.get(spk, {}).values())
             ntf = sum(d["n_tokens"] for d in f_avg.get(spk, {}).values())
-            print(f"    {spk}: {ntv} vowels, {nts} stops, {ntf} fricatives")
+            print(f"       {spk}: {ntv} vowels, {nts} stops, {ntf} fricatives", flush=True)
 
         # Cleanup MFA temp
         if os.path.exists(self.cfg.mfa_temp_dir):

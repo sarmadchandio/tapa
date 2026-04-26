@@ -83,6 +83,61 @@ results = pipeline.run("your_audio.mp3")
 - Free tier has ~12GB RAM — large audio files (>1 hour) may need `whisper_model="tiny.en"` to fit in memory
 - MFA install persists within a session but resets when the runtime disconnects
 
+### Optional: Dr.VOT for stop consonants
+
+By default TAPA measures Voice Onset Time with a Praat-based signal heuristic
+(burst = intensity peak; voicing onset = first f0 cycle). You can swap this for
+the deep-learning **Dr.VOT** model (Shrem et al., Interspeech 2019) which
+handles negative VOT (prevoicing) and is more robust on noisy or coarticulated
+speech. The unified pipeline keeps everything else (diarization, transcription,
+alignment, vowel formants, fricative spectral moments) on the TAPA path and
+only swaps in Dr.VOT for the stop step. Tokens Dr.VOT cannot predict
+automatically fall back to TAPA-Praat so coverage never drops.
+
+**One-time setup (Colab):**
+
+```python
+# 1. System deps Dr.VOT needs at runtime
+!apt-get install -y -qq praat sox
+
+# 2. Slim Python deps (do NOT install Dr.VOT's full requirements.txt — it pins
+#    older torch/numpy that conflict with Colab's preinstalled stack)
+!pip install -q boltons tqdm pydub soundfile praatio textgrid noisereduce
+
+# 3. Clone + patch Dr.VOT (idempotent)
+!python -m tapa.drvot setup /content/Dr.VOT
+```
+
+**Run with Dr.VOT as the stop backend:**
+
+```python
+from tapa import TAPAPipeline, TAPAConfig
+
+cfg = TAPAConfig(
+    mfa_bin="/opt/miniforge/bin/mfa",   # if you set up MFA above
+    vot_backend="drvot",
+    drvot_repo_dir="/content/Dr.VOT",
+)
+pipeline = TAPAPipeline(config=cfg)
+results = pipeline.run("your_audio.mp3")
+```
+
+Equivalent CLI:
+
+```bash
+tapa your_audio.mp3 --vot-backend drvot --drvot-repo /content/Dr.VOT
+```
+
+Each stop token in `*_stop_vot.json` then carries two extra fields:
+`vot_method` (`"drvot"` or `"tapa-fallback"`) and `vot_class_drvot`
+(`"POS"` for aspirated / `"NEG"` for prevoiced / `null`). The aggregated CSV
+(`*_stop_averages.csv`) is unchanged.
+
+**Dr.VOT notes:**
+- The model is small (~1.5 MB) and runs on CPU at ~1 s/token; GPU offers no benefit
+- English-trained — accuracy degrades on other languages
+- Per-recording overhead scales linearly with the number of stops (~5 min for a 30-min clip with ~300 stops)
+
 ## Quick Start
 
 ```python
@@ -197,6 +252,10 @@ segments = diarize("dialogue.wav", models=models)
 tapa interview.mp3
 tapa file1.mp3 file2.wav -o my_results/
 tapa podcast.mp3 --num-speakers 3 --whisper-model medium.en
+
+# YouTube URLs are downloaded to mp3 first (saved under --audio-dir, default audio/)
+tapa "https://youtu.be/DPO7imV0LHg" -o my_results/
+tapa "https://www.youtube.com/watch?v=DPO7imV0LHg" --audio-dir downloads/ --mp3-bitrate 256
 ```
 
 ## Output Files

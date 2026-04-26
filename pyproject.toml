@@ -37,6 +37,7 @@ dependencies = [
     "scipy",
     "numpy",
     "tqdm",
+    "yt-dlp",
 ]
 
 [project.optional-dependencies]

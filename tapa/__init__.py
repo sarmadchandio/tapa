@@ -1,6 +1,8 @@
 """TAPA - Text and Phonetic Analysis pipeline for speaker diarization and acoustic analysis."""
 
 from .config import TAPAConfig
+from .download import download_youtube_audio, is_youtube_url
+from .drvot import extract_all_stop_measurements_drvot, setup_drvot
 from .pipeline import TAPAPipeline
 from .shortcuts import (
     Models,
@@ -25,4 +27,8 @@ __all__ = [
     "extract_formants",
     "extract_consonants",
     "compute_averages",
+    "download_youtube_audio",
+    "is_youtube_url",
+    "setup_drvot",
+    "extract_all_stop_measurements_drvot",
 ]

@@ -69,6 +69,12 @@ class TAPAPipeline:
         print(f"[TAPA] VOT backend: {self.cfg.vot_backend}"
               + (f"  (Dr.VOT repo: {self.cfg.drvot_repo_dir})"
                  if self.cfg.vot_backend == "drvot" else ""), flush=True)
+
+        # Validate Dr.VOT setup up-front so missing prerequisites don't blow up
+        # 5 minutes into the run (after diarization/transcription/alignment).
+        if self.cfg.vot_backend == "drvot":
+            self._ensure_drvot_ready()
+
         print("[TAPA 1/4] Loading Silero VAD...", flush=True)
         self.vad_model, self.get_speech_timestamps = load_silero_vad()
 
@@ -89,6 +95,36 @@ class TAPAPipeline:
 
         self._models_loaded = True
         print("[TAPA] Models loaded.", flush=True)
+
+    def _ensure_drvot_ready(self):
+        """Validate (and auto-setup if needed) the Dr.VOT install before the run.
+
+        Runs early in load_models() so a missing repo or weights doesn't waste
+        the user's Whisper/MFA work.
+        """
+        if not self.cfg.drvot_repo_dir:
+            raise RuntimeError(
+                "vot_backend='drvot' requires drvot_repo_dir to be set. "
+                "Pass TAPAConfig(drvot_repo_dir='/path/to/Dr.VOT'). "
+                "On Colab the canonical location is '/content/Dr.VOT'."
+            )
+        repo = Path(self.cfg.drvot_repo_dir)
+        weights = repo / "final_models" / "adv_model.model"
+        if repo.exists() and weights.exists():
+            print(f"[TAPA] Dr.VOT setup verified at {repo}", flush=True)
+            return
+        # Either the directory is missing entirely, or the clone is incomplete.
+        # Auto-run setup. If praat or git is missing, this raises with an
+        # actionable error before we've done any expensive work.
+        from .drvot import setup_drvot
+        if not repo.exists():
+            print(f"[TAPA] Dr.VOT repo not found at {repo} — auto-running setup...",
+                  flush=True)
+        else:
+            print(f"[TAPA] Dr.VOT clone at {repo} appears incomplete "
+                  f"(missing {weights.name}) — re-running setup...", flush=True)
+        setup_drvot(repo, force=False)
+        print("[TAPA] Dr.VOT setup complete.", flush=True)
 
     def run(self, audio_path, results_dir=None):
         """Run the full pipeline on a single audio file or YouTube URL.

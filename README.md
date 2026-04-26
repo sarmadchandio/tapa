@@ -13,40 +13,81 @@ they say, and extracts detailed acoustic measurements per speaker.
 4. **Vowel formants** — F1, F2, and pitch for each vowel token
 5. **Stop consonant VOT** — Voice Onset Time. Backend is selectable:
    - `"tapa"` (default) — Praat-based signal heuristic; fast, deterministic
-   - `"drvot"` — Dr.VOT CNN (Shrem et al. 2019); handles negative VOT
-     (prevoicing); slower; per-token TAPA fallback for tokens it can't predict
+   - `"drvot"` — Dr.VOT, a neural-network model (Shrem et al. 2019); handles
+     negative VOT (prevoicing); slower; with automatic per-token TAPA fallback
+     for stops it can't predict
 6. **Fricative spectral moments** — Center of Gravity, spectral SD, skewness,
    kurtosis
 7. **Per-speaker averages** — summary statistics with outlier rejection
 
 Inputs accepted: local `.mp3` / `.wav` / `.flac` files, **and YouTube URLs**
-(downloaded to mp3 via yt-dlp before processing).
+(downloaded to mp3 automatically before processing).
+
+---
+
+## Before you begin
+
+- **You need a Google account.** The walkthrough below uses Google Colab —
+  a free, browser-based notebook environment.
+- **The pipeline works best on English audio.** Whisper has multilingual
+  models you can swap in (`whisper_model="medium"`), but Dr.VOT is
+  English-trained, so for non-English recordings use the default
+  `vot_backend="tapa"`.
+- **Speaker labels are auto-assigned.** Diarization produces labels like
+  `SPEAKER_00`, `SPEAKER_01` in the order speakers are first heard. The
+  mapping to real names is up to you. If you know the number of speakers,
+  set `num_speakers=N` for more reliable clustering.
+- **Plan for time.** A 30-minute recording takes about 5 min with the
+  default backend, or ~25 min with the Dr.VOT backend. See the wall-clock
+  table below.
 
 ---
 
 ## Quick Start: Google Colab end-to-end walkthrough
 
-This is the canonical path for a new analysis. Open a fresh Colab notebook
-with a **GPU runtime** (Runtime → Change runtime type → GPU) and paste these
-cells in order.
+This is the canonical path for a new analysis.
 
-### Cell 1 — install TAPA (with the optional Dr.VOT extra)
+1. Open <https://colab.research.google.com>, sign in, and click
+   **File → New Notebook**.
+2. Switch on the GPU: **Runtime → Change runtime type → T4 GPU → Save**.
+3. Paste each cell below, in order, into separate notebook cells and run
+   them top-to-bottom.
+
+### Cell 1 — install TAPA
+
+Decide first whether you want the Dr.VOT backend (more accurate stop VOT,
+slower) or the default Praat-based backend (fast, deterministic). Compare
+them in the **[Backend choices](#backend-choices-tapa-vs-drvot)** section
+below before continuing.
+
+If you want **only the default backend**:
 
 ```python
-# System deps. praat + sox are only needed if you'll use the Dr.VOT backend.
-!apt-get install -y -qq praat sox
+!apt-get install -y -qq ffmpeg
+!pip install -q "git+https://github.com/sarmadchandio/tapa.git"
+```
 
-# Install TAPA. Drop the [drvot] suffix if you only want the default Praat-based
-# VOT backend.
+If you want **the Dr.VOT backend** (recommended for stop-VOT analysis):
+
+```python
+# praat + sox are needed by Dr.VOT; ffmpeg is needed for YouTube downloads.
+!apt-get install -y -qq ffmpeg praat sox
+# The "tapa[drvot]" form tells pip to also install Dr.VOT's extra deps
+# (boltons, pydub, textgrid, noisereduce). The "@ git+..." form tells pip
+# to install from this GitHub repo rather than from PyPI.
 !pip install -q "tapa[drvot] @ git+https://github.com/sarmadchandio/tapa.git"
 ```
 
-### Cell 2 — install MFA (recommended; gives precise phoneme boundaries)
+### Cell 2 — install MFA (recommended)
 
-Skip this cell to fall back to CMUdict proportional timing — TAPA still works,
-just with less accurate phoneme boundaries.
+The Montreal Forced Aligner gives precise phoneme boundaries. **Skip this
+cell** if you don't need them — TAPA falls back to a less accurate
+proportional-timing method based on CMUdict.
 
 ```python
+# This installs Miniforge (a conda variant), then uses it to install MFA
+# and download the English acoustic + pronunciation dictionary models.
+# First run takes 2–4 minutes — be patient.
 import os
 if not os.path.exists("/opt/miniforge"):
     !wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
@@ -59,39 +100,58 @@ if not os.path.exists("/opt/miniforge"):
 os.environ["PATH"] = "/opt/miniforge/bin:" + os.environ["PATH"]
 ```
 
-### Cell 3 — clone + patch Dr.VOT (skip if using `vot_backend="tapa"`)
+### Cell 3 — set up Dr.VOT
+
+**Skip this cell if you chose the default backend in Cell 1.**
 
 ```python
 !python -m tapa.drvot setup /content/Dr.VOT
 ```
 
-This is idempotent — safe to re-run. It clones the upstream Dr.VOT repo,
-patches a hard-coded Praat path inside it, and chmods the bundled feature
-extractor binary.
+This clones the upstream Dr.VOT repository into `/content/Dr.VOT`, patches
+a hard-coded path that ships in its scripts, and makes its bundled feature
+extractor executable. Safe to re-run if anything goes wrong.
 
 ### Cell 4 — run the pipeline
+
+Pick the variant that matches the choices you made above and paste it in.
+
+**Variant A — default backend, MFA, YouTube URL:**
+
+```python
+from tapa import TAPAPipeline, TAPAConfig
+
+cfg = TAPAConfig(mfa_bin="/opt/miniforge/bin/mfa")
+pipeline = TAPAPipeline(config=cfg)
+results = pipeline.run("https://www.youtube.com/watch?v=DPO7imV0LHg")
+```
+
+**Variant B — Dr.VOT backend, MFA, YouTube URL:**
 
 ```python
 from tapa import TAPAPipeline, TAPAConfig
 
 cfg = TAPAConfig(
-    mfa_bin="/opt/miniforge/bin/mfa",   # remove if you skipped Cell 2
-    vot_backend="drvot",                # or "tapa" for the Praat-only path
-    drvot_repo_dir="/content/Dr.VOT",   # remove if vot_backend="tapa"
+    mfa_bin="/opt/miniforge/bin/mfa",
+    vot_backend="drvot",
+    drvot_repo_dir="/content/Dr.VOT",
 )
 pipeline = TAPAPipeline(config=cfg)
-
-# Either a YouTube URL (auto-downloaded to ./audio/<video_id>.mp3)...
 results = pipeline.run("https://www.youtube.com/watch?v=DPO7imV0LHg")
-
-# ...or a local file:
-# results = pipeline.run("/content/my_recording.mp3")
 ```
 
-Result CSVs/JSONs land in `./results/` (configurable via `cfg.results_dir`
-or the `results_dir` argument to `run()`). The video ID is the filename stem,
-so for the URL above you get `DPO7imV0LHg_diarization.csv`,
-`DPO7imV0LHg_vowel_averages.csv`, etc.
+**Variant C — local audio file instead of a URL:**
+
+Replace the URL with a path to a file you uploaded to Colab (left sidebar
+→ folder icon → upload):
+
+```python
+results = pipeline.run("/content/my_recording.mp3")
+```
+
+Result CSVs and JSONs land in `./results/`. The video ID (or local
+filename) becomes the stem, so for the URL above you'll get
+`DPO7imV0LHg_diarization.csv`, `DPO7imV0LHg_vowel_averages.csv`, etc.
 
 ### Cell 5 — process several recordings in one session
 
@@ -119,7 +179,9 @@ in a loop as above.)
 
 ### What you should see at runtime
 
-Stage banners stream live to the cell output. Key lines to watch:
+Progress messages stream live to the cell output as each stage runs. Lines
+beginning with `[TAPA]` come from the main pipeline; `[DrVOT]` lines come
+from the Dr.VOT subprocess.
 
 ```
 [TAPA] Device: Tesla T4 (CUDA)
@@ -137,10 +199,12 @@ Stage banners stream live to the cell output. Key lines to watch:
 [DONE] DPO7imV0LHg.mp3  alignment=MFA, vot_backend=Dr.VOT (+ TAPA fallback)
 ```
 
-Pay attention to the `coverage:` line — it tells you how many stops Dr.VOT
-actually scored vs how many fell back to TAPA-Praat. If the fallback rate is
-high (>30%) on the first run, the clip window may be too tight; bump
-`drvot_clip_pre_ms` / `drvot_clip_post_ms`.
+The `coverage:` line is the most important one to glance at. It tells you
+how many stop consonants Dr.VOT successfully measured versus how many
+needed the TAPA-Praat fallback. If the fallback rate is high (>30%) on a
+clean recording, the audio window we send to Dr.VOT may be too tight; you
+can widen it with `drvot_clip_pre_ms=200, drvot_clip_post_ms=200` in the
+config.
 
 ### Wall-clock budget
 
@@ -163,10 +227,10 @@ acoustic + dictionary, Silero, and Resemblyzer weights.
 
 | | TAPA (default) | Dr.VOT |
 |---|---|---|
-| Method | Praat: intensity peak → first f0 cycle | CNN trained on labeled VOTs (Shrem et al. 2019) |
-| Speed | ~ms / token | ~1 s / token (CPU) |
-| Negative VOT (prevoicing) | not handled | handled (POS / NEG class output) |
-| Robustness on noisy/coarticulated speech | brittle | substantially better |
+| Method | Praat: intensity peak → first f0 cycle | Neural-network model trained on labeled VOTs (Shrem et al. 2019) |
+| Speed | ~ms per token | ~1 s per token (CPU) |
+| Negative VOT (prevoicing) | not handled | handled (`POS` aspirated / `NEG` prevoiced output) |
+| Robustness on noisy or coarticulated speech | brittle | substantially better |
 | Languages | language-agnostic in principle | English-trained; degrades on others |
 | Extra setup | none | `python -m tapa.drvot setup <dir>` |
 
@@ -284,12 +348,43 @@ SPEAKER_00,p,voiceless,bilabial,0.6,0.4,78.32,42,38
 SPEAKER_00,t,voiceless,alveolar,4.2,12.0,62.15,104,104
 ```
 
+### Reading the measurements
+
+For readers who haven't worked with these acoustic measurements before:
+
+- **F1, F2** (Hz) — vowel formants. F1 is roughly inversely related to vowel
+  height (lower F1 ≈ closer/higher vowel like /i/, /u/; higher F1 ≈ more
+  open vowel like /æ/, /ɑ/). F2 reflects backness (higher F2 ≈ more front
+  like /i/; lower F2 ≈ more back like /u/). A scatter of `mean_f2` (x, axis
+  reversed) vs `mean_f1` (y, axis reversed) is the classic "vowel space"
+  plot.
+- **VOT** (ms) — voice onset time. Time from a stop's burst release to the
+  start of voicing in the following segment. Aspirated voiceless stops
+  (English /p t k/) have positive VOT (~30–100 ms); prevoiced stops (some
+  varieties of /b d g/) have negative VOT.
+- **Spectral CoG** (Hz) — center of gravity of a fricative's spectrum.
+  Sibilants like /s, ʃ/ have high CoG (>3000 Hz); /f, θ/ have lower CoG.
+  Skewness, kurtosis, and spectral SD are the higher-order moments.
+- **`n_tokens` vs `n_after_filtering`** — total tokens identified vs how
+  many survived MAD outlier rejection (default threshold = 2). Use
+  `n_after_filtering` when reporting averages.
+
 ### Working with results in pandas
 
 ```python
 import pandas as pd
-vowels = pd.read_csv("results/interview_vowel_averages.csv")
+vowels = pd.read_csv("results/DPO7imV0LHg_vowel_averages.csv")
 print(vowels[vowels["speaker"] == "SPEAKER_00"][["vowel", "mean_f1", "mean_f2", "n_after_filtering"]])
+
+# Quick vowel-space plot
+import matplotlib.pyplot as plt
+fig, ax = plt.subplots()
+sub = vowels[vowels["speaker"] == "SPEAKER_00"]
+ax.scatter(sub["mean_f2"], sub["mean_f1"])
+for _, r in sub.iterrows():
+    ax.annotate(r["vowel"], (r["mean_f2"], r["mean_f1"]))
+ax.invert_xaxis(); ax.invert_yaxis()
+ax.set_xlabel("F2 (Hz)"); ax.set_ylabel("F1 (Hz)")
 ```
 
 ### Working with the results dict
@@ -382,6 +477,59 @@ stop_data = extract_all_stop_measurements_drvot(speaker_stops, audio_np, cfg)
 
 Supported audio formats: `.mp3`, `.wav`, `.flac`. URLs: any standard YouTube
 URL form (`youtube.com/watch?v=…`, `youtu.be/…`, `youtube.com/shorts/…`).
+
+---
+
+## Common issues
+
+**"`No video formats found`" / yt-dlp errors when passing a URL.**
+Your runtime has a stale `yt-dlp`. Restart the Colab runtime (Runtime →
+Disconnect and delete runtime), then re-run the install cell — it pulls
+the latest version. On a non-Colab machine: `pip install -U yt-dlp` and
+retry.
+
+**Whisper / diarization runs on CPU instead of GPU.** The `[TAPA] Device:`
+line will say `CPU` — meaning you forgot to switch the runtime. Click
+Runtime → Change runtime type → T4 GPU → Save, then run the cells again.
+
+**MFA install seems hung in Cell 2.** It legitimately takes 2–4 minutes the
+first time (Miniforge download + conda solve + acoustic + dictionary
+models). It's quick on subsequent runs in the same session.
+
+**Speaker labels seem off.** Diarization is automatic — `SPEAKER_00`,
+`SPEAKER_01` are assigned in order of first appearance, not in the order
+you'd expect. If you know the number of speakers, set
+`TAPAConfig(num_speakers=2)` for cleaner clustering. Then rename them by
+post-processing the CSVs.
+
+**Dr.VOT coverage is low (<70%).** Two common causes: (a) clip windows are
+too tight — pass `drvot_clip_pre_ms=200, drvot_clip_post_ms=200` in
+`TAPAConfig`; (b) the recording is heavily reverberant or noisy and Dr.VOT
+genuinely can't anchor — the TAPA-Praat fallback will still measure those
+tokens.
+
+**Non-English audio.** Use `TAPAConfig(whisper_model="medium")` (not
+`medium.en`). Stick to `vot_backend="tapa"` since Dr.VOT was English-trained.
+
+**"Out of memory" on long recordings.** Free-tier Colab has ~12 GB RAM. For
+recordings longer than ~1 hour use `TAPAConfig(whisper_model="tiny.en")`,
+or split the audio first with ffmpeg.
+
+**Colab session disconnected mid-run.** Free-tier sessions time out after
+~90 minutes idle. For long batches use a Colab Pro runtime, or save your
+intermediate results to Google Drive (`drive.mount("/content/drive")` then
+set `results_dir="/content/drive/MyDrive/tapa_results/"`).
+
+---
+
+## Citing
+
+If you use this pipeline in academic work, please cite:
+
+- The Dr.VOT paper (when using `vot_backend="drvot"`):
+  Shrem, Goldrick & Keshet (2019). "Dr.VOT: Measuring Positive and Negative
+  Voice Onset Time in the Wild." *Interspeech 2019*, 629–633.
+- Whisper, Resemblyzer, Praat / parselmouth, and MFA, as appropriate.
 
 ---
 

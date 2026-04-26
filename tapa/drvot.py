@@ -27,7 +27,6 @@ deps coexist with the Colab Python.
 from __future__ import annotations
 
 import csv
-import json
 import os
 import shutil
 import stat
@@ -35,6 +34,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from collections import defaultdict
 from pathlib import Path
 from typing import Optional
@@ -198,18 +198,21 @@ def _build_clip_index(speaker_stops: dict, audio_np: np.ndarray,
 # ---------------------------------------------------------------------------
 
 def _run(cmd: list[str], cwd: Path, label: str) -> None:
-    """Run a subprocess, streaming output prefixed with [DrVOT/<label>]."""
+    """Run a subprocess, streaming each stdout/stderr line live with a prefix."""
     _log(f"-> {label}: {' '.join(cmd)}")
-    proc = subprocess.run(cmd, cwd=str(cwd), check=False,
-                          capture_output=True, text=True)
-    for line in (proc.stdout or "").splitlines():
-        print(f"[DrVOT/{label}] {line}", flush=True)
-    for line in (proc.stderr or "").splitlines():
-        print(f"[DrVOT/{label}!] {line}", flush=True)
-    if proc.returncode != 0:
+    # Merge stderr into stdout so progress + error lines arrive in order.
+    proc = subprocess.Popen(
+        cmd, cwd=str(cwd),
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1,  # line-buffered
+    )
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        print(f"[DrVOT/{label}] {line.rstrip()}", flush=True)
+    rc = proc.wait()
+    if rc != 0:
         raise RuntimeError(
-            f"Dr.VOT step '{label}' failed (exit {proc.returncode}). "
-            "See log lines above."
+            f"Dr.VOT step '{label}' failed (exit {rc}). See log lines above."
         )
 
 
@@ -424,7 +427,10 @@ def extract_all_stop_measurements_drvot(speaker_stops: dict, audio_np: np.ndarra
         return dict(results)
 
     except Exception as e:
-        _log(f"FAILED: {e}; falling back to TAPA-Praat for the whole recording")
+        _log(f"FAILED: {type(e).__name__}: {e}")
+        for line in traceback.format_exc().splitlines():
+            _log(f"  {line}")
+        _log("falling back to TAPA-Praat for the whole recording")
         # Total-failure path: behave as if vot_backend were "tapa".
         from .consonants import extract_all_stop_measurements as _tapa_all
         results = _tapa_all(speaker_stops, audio_np, cfg)
@@ -460,9 +466,8 @@ def _main():
     if args.cmd == "setup":
         path = setup_drvot(args.repo_dir, force=args.force)
         _log(f"setup complete -> {path}")
-        _log("Next: install Dr.VOT's slim deps in the env you'll point TAPA at, e.g.")
-        _log("  pip install boltons tqdm pydub soundfile praatio textgrid noisereduce")
-        _log("Then run with --vot-backend=drvot --drvot-repo " + path)
+        _log("Now run TAPA with --vot-backend=drvot --drvot-repo " + path)
+        _log("(Slim Python deps come from `pip install tapa[drvot]`.)")
 
 
 if __name__ == "__main__":

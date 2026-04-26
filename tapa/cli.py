@@ -4,7 +4,6 @@ import argparse
 import sys
 
 from .config import TAPAConfig
-from .download import download_youtube_audio, is_youtube_url
 from .pipeline import TAPAPipeline
 
 
@@ -14,7 +13,9 @@ def main():
         description="TAPA: Speaker diarization + phonetic analysis pipeline",
     )
     parser.add_argument("audio", nargs="+",
-                        help="Audio file(s) or YouTube URL(s). Audio: .mp3, .wav, .flac.")
+                        help="Audio file(s) or YouTube URL(s). "
+                             "Audio formats: .mp3, .wav, .flac. URLs are "
+                             "downloaded to --audio-dir as mp3 first.")
     parser.add_argument("-o", "--output", default="results/", help="Output directory (default: results/)")
     parser.add_argument("--whisper-model", default="small.en", help="Whisper model name (default: small.en)")
     parser.add_argument("--num-speakers", type=int, default=None, help="Number of speakers (default: auto-detect)")
@@ -41,9 +42,11 @@ def main():
 
     cfg = TAPAConfig(
         results_dir=args.output,
+        audio_dir=args.audio_dir,
         whisper_model=args.whisper_model,
         num_speakers=args.num_speakers,
         mfa_bin=args.mfa_bin,
+        mp3_bitrate=args.mp3_bitrate,
         vot_backend=args.vot_backend,
         drvot_repo_dir=args.drvot_repo,
         drvot_python=args.drvot_python,
@@ -51,14 +54,9 @@ def main():
     )
     pipeline = TAPAPipeline(config=cfg)
 
+    # pipeline.run() handles URL-vs-path dispatch internally — just pass through.
     for inp in args.audio:
-        if is_youtube_url(inp):
-            print(f"Downloading {inp} -> {args.audio_dir} (mp3 @ {args.mp3_bitrate}k)")
-            audio_path = download_youtube_audio(inp, args.audio_dir, bitrate=args.mp3_bitrate)
-            print(f"Saved {audio_path}")
-        else:
-            audio_path = inp
-        pipeline.run(audio_path, results_dir=args.output)
+        pipeline.run(inp, results_dir=args.output)
 
     return 0
 

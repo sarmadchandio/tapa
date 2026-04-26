@@ -21,6 +21,7 @@ from .diarization import (
     load_silero_vad,
     save_diarization_csv,
 )
+from .download import download_youtube_audio, is_youtube_url
 from .drvot import extract_all_stop_measurements_drvot
 from .io import (
     save_fricative_averages_csv,
@@ -90,10 +91,13 @@ class TAPAPipeline:
         print("[TAPA] Models loaded.", flush=True)
 
     def run(self, audio_path, results_dir=None):
-        """Run the full pipeline on a single audio file.
+        """Run the full pipeline on a single audio file or YouTube URL.
 
         Args:
-            audio_path: Path to an audio file (.mp3, .wav, .flac).
+            audio_path: Either a path to an audio file (.mp3, .wav, .flac) or
+                a YouTube URL. URLs are downloaded to ``cfg.audio_dir`` as mp3
+                first (filename = video ID, so result files trace back to the
+                source recording).
             results_dir: Output directory. Defaults to config.results_dir.
 
         Returns:
@@ -101,6 +105,14 @@ class TAPAPipeline:
             stop_averages, fricative_averages, and file paths.
         """
         self.load_models()
+
+        # Accept either a local path or a YouTube URL — download first if URL.
+        if is_youtube_url(audio_path):
+            print(f"[TAPA] Input is a YouTube URL — downloading mp3 to "
+                  f"{self.cfg.audio_dir} @ {self.cfg.mp3_bitrate}k", flush=True)
+            audio_path = download_youtube_audio(audio_path, self.cfg.audio_dir,
+                                                bitrate=self.cfg.mp3_bitrate)
+            print(f"[TAPA] Saved {audio_path}", flush=True)
 
         results_dir = results_dir or self.cfg.results_dir
         os.makedirs(results_dir, exist_ok=True)

@@ -146,10 +146,16 @@ Each stop token in `*_stop_vot.json` then carries two extra fields:
 from tapa import TAPAPipeline
 
 pipeline = TAPAPipeline()
+
+# Either a local audio file...
 results = pipeline.run("interview.mp3")
+
+# ...or a YouTube URL (auto-downloaded to mp3 first; the video ID becomes the
+# filename stem so result files trace back to the source recording).
+results = pipeline.run("https://www.youtube.com/watch?v=DPO7imV0LHg")
 ```
 
-That's it. Results are saved to `results/` and returned as a dict.
+Results are saved to `results/` and returned as a dict.
 
 ## Usage
 

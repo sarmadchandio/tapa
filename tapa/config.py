@@ -45,6 +45,10 @@ class TAPAConfig:
     # Whisper model
     whisper_model: str = "small.en"
 
+    # When run() gets a YouTube URL, the downloaded mp3 is saved under audio_dir
+    # at this bitrate (kbps, passed to yt-dlp's preferredquality).
+    mp3_bitrate: str = "192"
+
     # VOT backend: "tapa" (Praat-based) or "drvot" (Dr.VOT CNN, with TAPA fallback)
     vot_backend: str = "tapa"
     drvot_repo_dir: Optional[str] = None

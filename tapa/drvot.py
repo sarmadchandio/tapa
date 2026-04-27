@@ -103,9 +103,11 @@ def setup_drvot(repo_dir: str | os.PathLike, force: bool = False) -> str:
             patched += 1
     _log(f"patched Praat path -> {praat_path} ({patched} file(s))")
 
-    # Make the bundled feature extractor executable. The repo ships a Linux and
-    # a macOS variant; we just chmod whichever exists.
-    for cand in ("linux_VotFrontEnd2", "mac_VotFrontEnd2", "VotFrontEnd2"):
+    # Make the bundled feature extractor executable. The repo ships a Linux
+    # and a macOS variant under process_data/. We chmod whichever exists.
+    # (They ship with +x set, but tar archives sometimes drop the bit.)
+    for cand in ("process_data/linux_VotFrontEnd2",
+                 "process_data/mac_VotFrontEnd2"):
         b = repo / cand
         if b.exists():
             mode = b.stat().st_mode

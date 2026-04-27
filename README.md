@@ -70,8 +70,10 @@ If you want **only the default backend**:
 If you want **the Dr.VOT backend** (recommended for stop-VOT analysis):
 
 ```python
-# praat + sox are needed by Dr.VOT; ffmpeg is needed for YouTube downloads.
-!apt-get install -y -qq ffmpeg praat sox
+# Dr.VOT ships its own GUI-Praat binary that needs GTK 2 at runtime, so we
+# install libgtk2.0-0 + a couple of friends along with praat and sox.
+# ffmpeg is needed for YouTube downloads.
+!apt-get install -y -qq ffmpeg praat sox libgtk2.0-0 libglib2.0-0 libxtst6
 # The "tapa[drvot]" form tells pip to also install Dr.VOT's extra deps
 # (boltons, pydub, textgrid, noisereduce). The "@ git+..." form tells pip
 # to install from this GitHub repo rather than from PyPI.

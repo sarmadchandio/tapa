@@ -121,6 +121,26 @@ def setup_drvot(repo_dir: str | os.PathLike, force: bool = False) -> str:
             f"Expected Dr.VOT weights at {weights} but file is missing — "
             "the clone may be incomplete or the upstream layout changed."
         )
+
+    # Dr.VOT ships its own GUI-Praat binary at <repo>/linux_praat. Verify it
+    # can actually run by trying its --version. If GTK shared libraries are
+    # missing the binary errors out and the features step fails ~3 minutes
+    # later with a confusing praatio traceback. Surface the issue here.
+    bundled_praat = repo / "linux_praat"
+    if bundled_praat.exists():
+        try:
+            check = subprocess.run([str(bundled_praat), "--version"],
+                                   capture_output=True, text=True, timeout=10)
+            if check.returncode != 0 and "libgtk" in (check.stderr or ""):
+                _log("WARNING: Dr.VOT's bundled linux_praat needs libgtk2 "
+                     "(missing from this environment). Run: "
+                     "apt-get install -y libgtk2.0-0 libglib2.0-0 libxtst6")
+            elif check.returncode != 0:
+                _log(f"WARNING: bundled linux_praat exited {check.returncode}: "
+                     f"{(check.stderr or '').strip()[:200]}")
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+            _log(f"WARNING: could not verify bundled linux_praat: {e}")
+
     return str(repo)
 
 

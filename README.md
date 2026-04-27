@@ -102,17 +102,26 @@ if not os.path.exists("/opt/miniforge"):
 os.environ["PATH"] = "/opt/miniforge/bin:" + os.environ["PATH"]
 ```
 
-### Cell 3 — set up Dr.VOT
+### Cell 3 — Dr.VOT setup is automatic
 
-**Skip this cell if you chose the default backend in Cell 1.**
+**No cell needed.** When you run the pipeline below with
+`vot_backend="drvot"`, TAPA automatically clones Dr.VOT into the path you
+gave for `drvot_repo_dir`, patches the hard-coded paths inside it, and
+verifies the feature-extractor binary — all in-process. Watch for the
+`[TAPA] Dr.VOT repo not found at ... — auto-running setup...` line in the
+log on the first run.
+
+If you ever want to run setup explicitly (e.g. to pre-warm the clone),
+**you must use the explicit Python path** because Cell 2 puts miniforge's
+Python first on `PATH` and miniforge doesn't have `tapa` installed:
 
 ```python
-!python -m tapa.drvot setup /content/Dr.VOT
+import sys
+!{sys.executable} -m tapa.drvot setup /content/Dr.VOT
 ```
 
-This clones the upstream Dr.VOT repository into `/content/Dr.VOT`, patches
-a hard-coded path that ships in its scripts, and makes its bundled feature
-extractor executable. Safe to re-run if anything goes wrong.
+A bare `!python -m tapa.drvot ...` after Cell 2 will fail with
+`ModuleNotFoundError: No module named 'tapa'` for that reason.
 
 ### Cell 4 — run the pipeline
 

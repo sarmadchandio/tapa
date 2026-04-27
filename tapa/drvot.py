@@ -220,18 +220,43 @@ def _build_clip_index(speaker_stops: dict, audio_np: np.ndarray,
 # ---------------------------------------------------------------------------
 
 def _run(cmd: list[str], cwd: Path, label: str) -> None:
-    """Run a subprocess, streaming each stdout/stderr line live with a prefix."""
+    """Run a subprocess, streaming each stdout/stderr line live with a prefix.
+
+    Reads raw bytes (not text-mode) so carriage returns coming from tqdm
+    progress bars are preserved — text-mode would translate every \\r into \\n
+    and splay every progress update onto a fresh line. Each visible line
+    (terminated by either \\r or \\n) gets the [DrVOT/<label>] prefix.
+    """
     _log(f"-> {label}: {' '.join(cmd)}")
     # Merge stderr into stdout so progress + error lines arrive in order.
     proc = subprocess.Popen(
         cmd, cwd=str(cwd),
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, bufsize=1,  # line-buffered
+        bufsize=0,  # raw bytes, no line buffering
     )
     assert proc.stdout is not None
-    for line in proc.stdout:
-        print(f"[DrVOT/{label}] {line.rstrip()}", flush=True)
+    prefix = f"[DrVOT/{label}] ".encode()
+    out = sys.stdout.buffer
+    line_open = True  # next byte starts a new visible line — emit prefix first
+
+    while True:
+        chunk = proc.stdout.read(256)
+        if not chunk:
+            break
+        for byte in chunk:
+            b = bytes((byte,))
+            if line_open:
+                out.write(prefix)
+                line_open = False
+            out.write(b)
+            if b in (b"\r", b"\n"):
+                line_open = True
+        out.flush()
+
     rc = proc.wait()
+    if not line_open:
+        out.write(b"\n")
+        out.flush()
     if rc != 0:
         raise RuntimeError(
             f"Dr.VOT step '{label}' failed (exit {rc}). See log lines above."

@@ -499,6 +499,22 @@ Disconnect and delete runtime), then re-run the install cell — it pulls
 the latest version. On a non-Colab machine: `pip install -U yt-dlp` and
 retry.
 
+**"`Sign in to confirm you're not a bot`" on Colab.** TAPA already applies
+a default workaround (yt-dlp's alternate `player_client` list: `mweb`,
+`tv_simply`, `android_vr`, `web_safari`) which clears this for most
+videos. If a specific video still triggers it, export cookies from a
+logged-in browser (the [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)
+extension is the standard tool), upload the file to Colab, and pass it:
+
+```python
+cfg = TAPAConfig(youtube_cookies_file="/content/cookies.txt")
+results = TAPAPipeline(config=cfg).run("https://www.youtube.com/watch?v=...")
+```
+
+CLI equivalent: `tapa "https://..." --yt-cookies /content/cookies.txt`.
+The cookies are only used for the initial fetch — your audio file isn't
+re-uploaded anywhere.
+
 **Whisper / diarization runs on CPU instead of GPU.** The `[TAPA] Device:`
 line will say `CPU` — meaning you forgot to switch the runtime. Click
 Runtime → Change runtime type → T4 GPU → Save, then run the cells again.

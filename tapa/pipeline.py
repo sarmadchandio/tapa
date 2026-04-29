@@ -146,8 +146,12 @@ class TAPAPipeline:
         if is_youtube_url(audio_path):
             print(f"[TAPA] Input is a YouTube URL — downloading mp3 to "
                   f"{self.cfg.audio_dir} @ {self.cfg.mp3_bitrate}k", flush=True)
-            audio_path = download_youtube_audio(audio_path, self.cfg.audio_dir,
-                                                bitrate=self.cfg.mp3_bitrate)
+            audio_path = download_youtube_audio(
+                audio_path, self.cfg.audio_dir,
+                bitrate=self.cfg.mp3_bitrate,
+                cookies_file=self.cfg.youtube_cookies_file,
+                cookies_from_browser=self.cfg.youtube_cookies_from_browser,
+            )
             print(f"[TAPA] Saved {audio_path}", flush=True)
 
         results_dir = results_dir or self.cfg.results_dir

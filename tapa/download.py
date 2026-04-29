@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
 
@@ -16,6 +17,12 @@ YOUTUBE_HOSTS = {
     "youtube.com", "www.youtube.com", "m.youtube.com",
     "music.youtube.com", "youtu.be",
 }
+
+# Default alternate player clients used to bypass YouTube's "Sign in to
+# confirm you're not a bot" check that fires on datacenter IPs (Colab, AWS).
+# yt-dlp tries these in order and uses the first that returns playable streams
+# without triggering the web bot challenge.
+DEFAULT_YT_PLAYER_CLIENTS = ["mweb", "tv_simply", "android_vr", "web_safari"]
 
 
 def is_youtube_url(s: str) -> bool:
@@ -43,13 +50,22 @@ def youtube_video_id(url: str) -> str | None:
 
 
 def download_youtube_audio(url: str, output_dir: str | os.PathLike,
-                           bitrate: str = "192") -> str:
+                           bitrate: str = "192",
+                           cookies_file: Optional[str] = None,
+                           cookies_from_browser: Optional[str] = None) -> str:
     """Download `url` and transcode to mp3 in `output_dir`.
 
     Args:
         url: YouTube URL (any of the standard forms).
         output_dir: Directory to write the mp3 into. Created if missing.
         bitrate: mp3 bitrate in kbps as a string (yt-dlp's preferredquality).
+        cookies_file: Path to a Netscape-format cookies.txt exported from a
+            logged-in browser. Use this on Colab / cloud IPs that still
+            hit "Sign in to confirm you're not a bot" even with the default
+            alternate-client workaround.
+        cookies_from_browser: Browser name (e.g. "chrome", "firefox", "edge")
+            to read cookies from directly. Only works when that browser's
+            profile is on the same machine — has no effect on Colab.
 
     Returns:
         Absolute path to the resulting `.mp3` file.
@@ -68,19 +84,27 @@ def download_youtube_audio(url: str, output_dir: str | os.PathLike,
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use the video ID as the stem so downstream results are traceable.
+    # Default workaround for YouTube's "Sign in to confirm you're not a bot"
+    # challenge on datacenter IPs: ask yt-dlp for non-web player clients,
+    # which return playable streams without the web bot check. Users can
+    # supply real cookies via cookies_file / cookies_from_browser if needed.
     opts = {
         "format": "bestaudio/best",
         "outtmpl": str(out_dir / "%(id)s.%(ext)s"),
         "quiet": False,
         "no_warnings": False,
         "noplaylist": True,
+        "extractor_args": {"youtube": {"player_client": DEFAULT_YT_PLAYER_CLIENTS}},
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
             "preferredquality": bitrate,
         }],
     }
+    if cookies_file:
+        opts["cookiefile"] = str(cookies_file)
+    if cookies_from_browser:
+        opts["cookiesfrombrowser"] = (cookies_from_browser,)
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)

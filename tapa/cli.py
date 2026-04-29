@@ -24,6 +24,15 @@ def main():
                         help="Where to save audio downloaded from URLs (default: audio/)")
     parser.add_argument("--mp3-bitrate", default="192",
                         help="mp3 bitrate (kbps) for downloaded audio (default: 192)")
+    parser.add_argument("--yt-cookies", default=None,
+                        help="Path to a Netscape cookies.txt exported from a logged-in "
+                             "browser. Use if YouTube serves the bot challenge on "
+                             "Colab/cloud IPs. Optional — alternate player_client "
+                             "workaround is applied by default.")
+    parser.add_argument("--yt-cookies-from-browser", default=None,
+                        help="Read YouTube cookies directly from a local browser "
+                             "(e.g. chrome, firefox, edge). Only works on machines "
+                             "where that browser is installed; not useful on Colab.")
     parser.add_argument("--vot-backend", choices=["tapa", "drvot"], default="tapa",
                         help="Stop-VOT backend: 'tapa' (Praat-based) or 'drvot' "
                              "(Dr.VOT CNN with per-token TAPA fallback). Default: tapa")
@@ -47,6 +56,8 @@ def main():
         num_speakers=args.num_speakers,
         mfa_bin=args.mfa_bin,
         mp3_bitrate=args.mp3_bitrate,
+        youtube_cookies_file=args.yt_cookies,
+        youtube_cookies_from_browser=args.yt_cookies_from_browser,
         vot_backend=args.vot_backend,
         drvot_repo_dir=args.drvot_repo,
         drvot_python=args.drvot_python,

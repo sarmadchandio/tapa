@@ -38,6 +38,7 @@ dependencies = [
     "numpy",
     "tqdm",
     "yt-dlp",
+    "pytubefix",
 ]
 
 [project.optional-dependencies]

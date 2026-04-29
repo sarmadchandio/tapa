@@ -226,6 +226,10 @@ def _run(cmd: list[str], cwd: Path, label: str) -> None:
     progress bars are preserved — text-mode would translate every \\r into \\n
     and splay every progress update onto a fresh line. Each visible line
     (terminated by either \\r or \\n) gets the [DrVOT/<label>] prefix.
+
+    Writes through sys.stdout.buffer when available; on Colab / IPython
+    (where sys.stdout is an OutStream without a .buffer attribute) falls
+    back to writing decoded text through sys.stdout itself.
     """
     _log(f"-> {label}: {' '.join(cmd)}")
     # Merge stderr into stdout so progress + error lines arrive in order.
@@ -236,7 +240,15 @@ def _run(cmd: list[str], cwd: Path, label: str) -> None:
     )
     assert proc.stdout is not None
     prefix = f"[DrVOT/{label}] ".encode()
-    out = sys.stdout.buffer
+
+    if hasattr(sys.stdout, "buffer"):
+        write = sys.stdout.buffer.write
+        flush = sys.stdout.buffer.flush
+    else:
+        # IPython OutStream (Colab) — emit decoded text instead of raw bytes.
+        write = lambda b: sys.stdout.write(b.decode("utf-8", errors="replace"))
+        flush = sys.stdout.flush
+
     line_open = True  # next byte starts a new visible line — emit prefix first
 
     while True:
@@ -246,17 +258,17 @@ def _run(cmd: list[str], cwd: Path, label: str) -> None:
         for byte in chunk:
             b = bytes((byte,))
             if line_open:
-                out.write(prefix)
+                write(prefix)
                 line_open = False
-            out.write(b)
+            write(b)
             if b in (b"\r", b"\n"):
                 line_open = True
-        out.flush()
+        flush()
 
     rc = proc.wait()
     if not line_open:
-        out.write(b"\n")
-        out.flush()
+        write(b"\n")
+        flush()
     if rc != 0:
         raise RuntimeError(
             f"Dr.VOT step '{label}' failed (exit {rc}). See log lines above."

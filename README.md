@@ -188,6 +188,41 @@ pipeline.run_batch(audio_dir="/content/recordings/", results_dir="/content/resul
 (`run_batch` does not currently accept URL lists — pass URLs through `run()`
 in a loop as above.)
 
+### Cell 6 — download all results as a zip
+
+Colab's `/content/` directory disappears when the runtime disconnects, so
+zip the results and pull them to your local machine before logging off.
+This packages every CSV, JSON, and TextGrid the pipeline wrote and
+triggers a browser download:
+
+```python
+import shutil
+from google.colab import files
+
+# Bundle everything in the results dir into a single archive.
+zip_path = shutil.make_archive("/content/tapa_results", "zip", "/content/results")
+print(f"Wrote {zip_path}")
+
+# Trigger a browser download (the file lands in your local Downloads folder).
+files.download(zip_path)
+```
+
+If the pipeline wrote to a custom directory, point `make_archive` at that
+path instead. If you want a timestamped filename so you can keep multiple
+runs straight:
+
+```python
+from datetime import datetime
+stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+zip_path = shutil.make_archive(f"/content/tapa_results_{stamp}", "zip", "/content/results")
+files.download(zip_path)
+```
+
+For very long runs you can also save directly to your Google Drive (the
+zip survives runtime disconnects without manual download): mount Drive
+with `from google.colab import drive; drive.mount('/content/drive')` and
+write `make_archive("/content/drive/MyDrive/tapa_results", "zip", "/content/results")`.
+
 ### What you should see at runtime
 
 Progress messages stream live to the cell output as each stage runs. Lines

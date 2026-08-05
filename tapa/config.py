@@ -17,6 +17,13 @@ class TAPAConfig:
     # MFA binary path (auto-detected if None)
     mfa_bin: Optional[str] = None
 
+    # Align per diarization segment (MFA corpus mode) instead of feeding the
+    # whole recording as one utterance. Single-utterance alignment makes MFA's
+    # lattice scale with the full transcript — GBs of RAM / possible hangs on
+    # long recordings — so keep this on unless debugging alignment itself.
+    mfa_split_utterances: bool = True
+    mfa_utterance_pad: float = 0.25  # seconds of context around each utterance
+
     # Diarization
     num_speakers: Optional[int] = None
     min_segment_duration: float = 0.1

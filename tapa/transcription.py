@@ -3,9 +3,13 @@
 import csv
 
 
-def transcribe_audio(audio_path, whisper_model):
-    """Transcribe audio using Whisper with word-level timestamps."""
-    result = whisper_model.transcribe(audio_path, word_timestamps=True, language="en")
+def transcribe_audio(audio, whisper_model):
+    """Transcribe audio using Whisper with word-level timestamps.
+
+    ``audio`` is a path or a float32 mono 16 kHz numpy array — Whisper accepts
+    both; the array form avoids decoding the file a second time.
+    """
+    result = whisper_model.transcribe(audio, word_timestamps=True, language="en")
     words = []
     for segment in result["segments"]:
         for w in segment.get("words", []):

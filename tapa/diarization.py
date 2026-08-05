@@ -4,10 +4,10 @@ import csv
 
 import numpy as np
 import torch
-import torchaudio
 from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.spatial.distance import pdist
 
+from .audio import load_audio_16k
 from .config import TAPAConfig
 
 
@@ -20,20 +20,23 @@ def load_silero_vad():
     return model, utils[0]
 
 
-def get_speech_segments(audio_path, vad_model, get_speech_timestamps, cfg=None):
+def get_speech_segments(audio, vad_model, get_speech_timestamps, cfg=None):
     """Detect speech segments using Silero VAD.
 
-    Returns (segments, wav_1d_tensor, sample_rate).
+    ``audio`` is either a path or a float32 mono 16 kHz numpy array (as
+    returned by load_audio_16k) — passing the array lets callers decode the
+    file once and share the buffer across pipeline stages.
+
+    Returns (segments, wav_1d_tensor, sample_rate). The tensor shares memory
+    with the input array when one is given.
     """
     if cfg is None:
         cfg = TAPAConfig()
-    wav, sr = torchaudio.load(audio_path)
-    if sr != 16000:
-        wav = torchaudio.functional.resample(wav, sr, 16000)
-        sr = 16000
-    if wav.shape[0] > 1:
-        wav = wav.mean(dim=0, keepdim=True)
-    wav_1d = wav.squeeze(0)
+    sr = 16000
+    if isinstance(audio, np.ndarray):
+        wav_1d = torch.from_numpy(audio)
+    else:
+        wav_1d = torch.from_numpy(load_audio_16k(audio, sr))
     speech_timestamps = get_speech_timestamps(
         wav_1d, vad_model, sampling_rate=sr,
         min_speech_duration_ms=100, min_silence_duration_ms=300, speech_pad_ms=30,

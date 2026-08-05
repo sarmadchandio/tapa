@@ -15,7 +15,7 @@ def load_silero_vad():
     """Load Silero VAD model and return (model, get_speech_timestamps)."""
     model, utils = torch.hub.load(
         repo_or_dir="snakers4/silero-vad", model="silero_vad",
-        force_reload=False, onnx=False,
+        force_reload=False, onnx=False, trust_repo=True,
     )
     return model, utils[0]
 

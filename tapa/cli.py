@@ -27,8 +27,9 @@ def main():
     parser.add_argument("--yt-cookies", default=None,
                         help="Path to a Netscape cookies.txt exported from a logged-in "
                              "browser. Use if YouTube serves the bot challenge on "
-                             "Colab/cloud IPs. Optional — alternate player_client "
-                             "workaround is applied by default.")
+                             "Colab/cloud IPs. Optional — cookies.txt in the working "
+                             "directory, /content, ~, or $TAPA_YT_COOKIES is "
+                             "auto-discovered when this flag is omitted.")
     parser.add_argument("--yt-cookies-from-browser", default="auto",
                         help="Read YouTube cookies directly from a local browser "
                              "(e.g. chrome, firefox, edge). Default: auto — use the "

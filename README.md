@@ -160,6 +160,13 @@ Replace the URL with a path to a file you uploaded to Colab (left sidebar
 results = pipeline.run("/content/my_recording.mp3")
 ```
 
+> **If the YouTube download fails with a "confirm you're not a bot" error:**
+> export `cookies.txt` from a logged-in browser on your own computer (e.g.
+> with the *Get cookies.txt LOCALLY* extension), upload it to Colab via the
+> left-sidebar folder icon, and re-run the cell — TAPA picks up
+> `/content/cookies.txt` automatically. Full walkthrough in
+> [Common issues](#common-issues).
+
 Result CSVs and JSONs land in `./results/`. The video ID (or local
 filename) becomes the stem, so for the URL above you'll get
 `DPO7imV0LHg_diarization.csv`, `DPO7imV0LHg_vowel_averages.csv`, etc.
@@ -537,20 +544,29 @@ retry.
 **"`Sign in to confirm you're not a bot`" on Colab.** TAPA tries two
 downloaders automatically: first `yt-dlp` with alternate player clients
 (`mweb`, `tv_simply`, `android_vr`, `web_safari`), and if that gets bot-
-checked, `pytubefix` with a different code path. One of those clears
-the challenge for most videos with no manual steps required.
+checked, `pytubefix` with a different code path. On a local machine with a
+browser installed, TAPA also reads that browser's YouTube cookies
+automatically. One of those clears the challenge for most videos with no
+manual steps required.
 
-If both fall over (it does happen on heavily-flagged Colab IPs), the
-deterministic fix is to pass real cookies from a logged-in browser.
-Export with the [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)
-extension, upload the file to Colab, and run:
+If everything falls over (it does happen on heavily-flagged Colab IPs),
+the deterministic fix is real cookies from a logged-in browser:
 
-```python
-cfg = TAPAConfig(youtube_cookies_file="/content/cookies.txt")
-results = TAPAPipeline(config=cfg).run("https://www.youtube.com/watch?v=...")
-```
+1. On your own computer, install the
+   [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)
+   extension (Chrome; also on Firefox add-ons).
+2. Open <https://youtube.com> while logged in and click the extension to
+   export `cookies.txt`.
+3. Upload it to Colab: folder icon in the left sidebar → upload. Keep the
+   name `cookies.txt` — it lands in `/content/`.
+4. Re-run the pipeline cell, unchanged. TAPA auto-discovers `cookies.txt`
+   in `/content/`, the working directory, `~`, or a path set in the
+   `TAPA_YT_COOKIES` environment variable — no config needed. You'll see
+   `[TAPA] Using auto-discovered YouTube cookies file: ...` in the log.
 
-CLI equivalent: `tapa "https://..." --yt-cookies /content/cookies.txt`.
+To point at a non-standard location explicitly:
+`TAPAConfig(youtube_cookies_file="/path/to/cookies.txt")`, or on the CLI
+`tapa "https://..." --yt-cookies /path/to/cookies.txt`.
 Cookies are only sent to YouTube for the fetch — your audio file isn't
 re-uploaded anywhere.
 

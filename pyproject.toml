@@ -37,7 +37,10 @@ dependencies = [
     "scipy",
     "numpy",
     "tqdm",
-    "yt-dlp",
+    # Version floor matters: Colab preinstalls a months-old yt-dlp that pip
+    # would otherwise leave in place, and stale yt-dlp is the top cause of
+    # YouTube "confirm you're not a bot" failures.
+    "yt-dlp>=2026.7.4",
     "pytubefix",
 ]
 

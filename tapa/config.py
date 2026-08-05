@@ -54,7 +54,10 @@ class TAPAConfig:
     # first installed browser found (firefox, chrome, ...), or run cookieless
     # when none is installed (e.g. Colab). Set to a browser name ("chrome",
     # "firefox", ...) to force one, or None/"none" to disable. A cookies_file,
-    # if given, takes precedence over browser auto-detection.
+    # if given, takes precedence over browser auto-detection. When cookies_file
+    # is None, well-known locations are probed automatically ($TAPA_YT_COOKIES,
+    # then cookies.txt / youtube_cookies.txt in the CWD, /content — Colab's
+    # upload dir — and ~), so on Colab uploading cookies.txt is all it takes.
     youtube_cookies_file: Optional[str] = None          # path to Netscape cookies.txt
     youtube_cookies_from_browser: Optional[str] = "auto"
 

@@ -57,6 +57,36 @@ def _detect_cookie_browser() -> Optional[str]:
     return None
 
 
+# Env var and well-known locations probed for a Netscape cookies.txt when no
+# cookies_file is passed explicitly. /content is Colab's upload directory, so
+# on Colab "upload cookies.txt via the sidebar, re-run the cell" just works
+# with zero configuration.
+COOKIE_FILE_ENV_VAR = "TAPA_YT_COOKIES"
+COOKIE_FILE_CANDIDATES = [
+    "cookies.txt",
+    "youtube_cookies.txt",
+    "/content/cookies.txt",
+    "/content/youtube_cookies.txt",
+    "~/cookies.txt",
+]
+
+
+def _discover_cookies_file() -> Optional[str]:
+    """Find a cookies.txt via $TAPA_YT_COOKIES or well-known paths, else None."""
+    env = os.environ.get(COOKIE_FILE_ENV_VAR)
+    if env:
+        p = Path(env).expanduser()
+        if p.is_file():
+            return str(p.resolve())
+        print(f"[TAPA] Warning: {COOKIE_FILE_ENV_VAR}={env} does not exist — ignoring.",
+              flush=True)
+    for cand in COOKIE_FILE_CANDIDATES:
+        p = Path(cand).expanduser()
+        if p.is_file():
+            return str(p.resolve())
+    return None
+
+
 def is_youtube_url(s: str) -> bool:
     """Return True if `s` looks like a YouTube URL."""
     try:
@@ -190,7 +220,10 @@ def download_youtube_audio(url: str, output_dir: str | os.PathLike,
         url: YouTube URL (any standard form).
         output_dir: Directory to write the mp3 into. Created if missing.
         bitrate: mp3 bitrate in kbps as a string.
-        cookies_file: Path to Netscape cookies.txt for stubborn videos.
+        cookies_file: Path to Netscape cookies.txt for stubborn videos. When
+            None, well-known locations are probed automatically ($TAPA_YT_COOKIES,
+            then cookies.txt / youtube_cookies.txt in the current directory,
+            /content — Colab's upload dir — and the home directory).
         cookies_from_browser: Browser name to read cookies from (local machines
             only). "auto" (the default) uses the first installed browser found,
             or no cookies when none is installed (e.g. Colab). None or "none"
@@ -201,6 +234,15 @@ def download_youtube_audio(url: str, output_dir: str | os.PathLike,
     """
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    auto_cookies_file = False
+    if not cookies_file:
+        discovered = _discover_cookies_file()
+        if discovered:
+            cookies_file = discovered
+            auto_cookies_file = True
+            print(f"[TAPA] Using auto-discovered YouTube cookies file: {discovered}",
+                  flush=True)
 
     auto_browser = False
     if cookies_from_browser == "none":
@@ -225,23 +267,27 @@ def download_youtube_audio(url: str, output_dir: str | os.PathLike,
     except Exception as e:
         ytdlp_error = e
         bot_check = _is_bot_check_error(e)
-        # Auto-detected cookies must never make things worse than the old
-        # no-cookies default: if extraction blew up for cookie-related reasons
-        # (locked Chrome DB, keyring, corrupt profile), retry without them.
-        # A bot-check error is not cookie-caused — retrying cookieless there is
-        # pointless, so go straight to the pytubefix fallback below.
-        if auto_browser and not bot_check:
-            print(f"[TAPA] yt-dlp failed with auto-detected browser cookies "
+        # Auto-detected cookies (browser or discovered cookies.txt) must never
+        # make things worse than the old no-cookies default: if the failure
+        # looks cookie-related (locked Chrome DB, keyring, corrupt/malformed
+        # cookies.txt), retry without the auto-picked cookies. A bot-check
+        # error is not cookie-caused — retrying cookieless there is pointless,
+        # so go straight to the pytubefix fallback below.
+        if (auto_browser or auto_cookies_file) and not bot_check:
+            print(f"[TAPA] yt-dlp failed with auto-detected cookies "
                   f"({e}) — retrying without them...", flush=True)
             try:
-                return _download_with_ytdlp(url, out_dir, bitrate,
-                                            cookies_file, None)
+                return _download_with_ytdlp(
+                    url, out_dir, bitrate,
+                    None if auto_cookies_file else cookies_file,
+                    None if auto_browser else cookies_from_browser)
             except Exception as retry_err:
                 ytdlp_error = retry_err
                 bot_check = _is_bot_check_error(retry_err)
         # If the user explicitly supplied cookies, they're authoritative —
         # there's no point in falling back to pytubefix, which doesn't use them.
-        if cookies_file or (cookies_from_browser and not auto_browser):
+        if (cookies_file and not auto_cookies_file) or \
+                (cookies_from_browser and not auto_browser):
             raise
         # Only fall back on bot-check errors. Other yt-dlp failures (private
         # video, region-blocked, network down) won't be fixed by switching libs.
@@ -259,8 +305,18 @@ def download_youtube_audio(url: str, output_dir: str | os.PathLike,
             f"Both yt-dlp and pytubefix failed to download {url}.\n"
             f"  yt-dlp error: {ytdlp_error}\n"
             f"  pytubefix error: {pytube_err}\n\n"
-            f"This means YouTube is hard-blocking your IP for this video. The reliable "
-            f"fix is to export cookies.txt from a logged-in browser and pass it via "
-            f"TAPAConfig(youtube_cookies_file='/path/to/cookies.txt'). "
-            f"See the README's 'Common issues' section for the full walkthrough."
+            f"YouTube is hard-blocking this machine's IP for this video (very common\n"
+            f"on Colab / cloud runtimes). The reliable fix is real cookies from a\n"
+            f"logged-in browser:\n"
+            f"  1. On your own computer, install the 'Get cookies.txt LOCALLY'\n"
+            f"     extension (Chrome web store / Firefox add-ons).\n"
+            f"  2. Open youtube.com while logged in and click the extension to\n"
+            f"     export a cookies.txt file.\n"
+            f"  3. Upload it here keeping the name cookies.txt — on Colab: folder\n"
+            f"     icon in the left sidebar -> upload (it lands in /content/).\n"
+            f"  4. Re-run the same cell. TAPA auto-discovers cookies.txt in\n"
+            f"     /content/, the working directory, ~, or $TAPA_YT_COOKIES —\n"
+            f"     no config change needed.\n"
+            f"If you already uploaded cookies and still see this, your yt-dlp is\n"
+            f"likely outdated: run `pip install -U yt-dlp` and restart the runtime."
         ) from pytube_err

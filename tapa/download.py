@@ -34,6 +34,28 @@ YOUTUBE_HOSTS = {
 # without triggering the web bot challenge.
 DEFAULT_YT_PLAYER_CLIENTS = ["mweb", "tv_simply", "android_vr", "web_safari"]
 
+# Browsers probed by cookies_from_browser="auto", in preference order.
+# Firefox first: its cookie store needs no OS keyring to decrypt, so extraction
+# works even in headless sessions where Chrome's keyring may be locked.
+# Values are yt-dlp browser names -> executables that indicate it's installed.
+AUTO_COOKIE_BROWSERS = [
+    ("firefox", ["firefox"]),
+    ("chrome", ["google-chrome", "google-chrome-stable", "chrome"]),
+    ("chromium", ["chromium", "chromium-browser"]),
+    ("brave", ["brave-browser", "brave"]),
+    ("edge", ["microsoft-edge", "microsoft-edge-stable"]),
+    ("vivaldi", ["vivaldi"]),
+    ("opera", ["opera"]),
+]
+
+
+def _detect_cookie_browser() -> Optional[str]:
+    """Return the yt-dlp name of the first installed browser, or None (e.g. Colab)."""
+    for browser, executables in AUTO_COOKIE_BROWSERS:
+        if any(shutil.which(exe) for exe in executables):
+            return browser
+    return None
+
 
 def is_youtube_url(s: str) -> bool:
     """Return True if `s` looks like a YouTube URL."""
@@ -157,7 +179,7 @@ def _download_with_pytubefix(url: str, out_dir: Path, bitrate: str) -> str:
 def download_youtube_audio(url: str, output_dir: str | os.PathLike,
                            bitrate: str = "192",
                            cookies_file: Optional[str] = None,
-                           cookies_from_browser: Optional[str] = None) -> str:
+                           cookies_from_browser: Optional[str] = "auto") -> str:
     """Download `url` and produce an mp3 in `output_dir`.
 
     Tries yt-dlp first, automatically falls back to pytubefix if yt-dlp hits
@@ -169,13 +191,27 @@ def download_youtube_audio(url: str, output_dir: str | os.PathLike,
         output_dir: Directory to write the mp3 into. Created if missing.
         bitrate: mp3 bitrate in kbps as a string.
         cookies_file: Path to Netscape cookies.txt for stubborn videos.
-        cookies_from_browser: Browser name to read cookies from (local machines only).
+        cookies_from_browser: Browser name to read cookies from (local machines
+            only). "auto" (the default) uses the first installed browser found,
+            or no cookies when none is installed (e.g. Colab). None or "none"
+            disables browser cookies entirely.
 
     Returns:
         Absolute path to the resulting `.mp3` file.
     """
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    auto_browser = False
+    if cookies_from_browser == "none":
+        cookies_from_browser = None
+    elif cookies_from_browser == "auto":
+        cookies_from_browser = None if cookies_file else _detect_cookie_browser()
+        auto_browser = cookies_from_browser is not None
+        if auto_browser:
+            print(f"[TAPA] Using YouTube cookies from detected browser: "
+                  f"{cookies_from_browser} (pass cookies_from_browser='none' to disable).",
+                  flush=True)
 
     ytdlp_error: Optional[BaseException] = None
     try:
@@ -189,14 +225,28 @@ def download_youtube_audio(url: str, output_dir: str | os.PathLike,
     except Exception as e:
         ytdlp_error = e
         bot_check = _is_bot_check_error(e)
-        # If the user already supplied cookies, they're authoritative — there's
-        # no point in falling back to pytubefix, which doesn't use them.
-        if cookies_file or cookies_from_browser:
+        # Auto-detected cookies must never make things worse than the old
+        # no-cookies default: if extraction blew up for cookie-related reasons
+        # (locked Chrome DB, keyring, corrupt profile), retry without them.
+        # A bot-check error is not cookie-caused — retrying cookieless there is
+        # pointless, so go straight to the pytubefix fallback below.
+        if auto_browser and not bot_check:
+            print(f"[TAPA] yt-dlp failed with auto-detected browser cookies "
+                  f"({e}) — retrying without them...", flush=True)
+            try:
+                return _download_with_ytdlp(url, out_dir, bitrate,
+                                            cookies_file, None)
+            except Exception as retry_err:
+                ytdlp_error = retry_err
+                bot_check = _is_bot_check_error(retry_err)
+        # If the user explicitly supplied cookies, they're authoritative —
+        # there's no point in falling back to pytubefix, which doesn't use them.
+        if cookies_file or (cookies_from_browser and not auto_browser):
             raise
         # Only fall back on bot-check errors. Other yt-dlp failures (private
         # video, region-blocked, network down) won't be fixed by switching libs.
         if not bot_check:
-            raise
+            raise ytdlp_error
         print(f"[TAPA] yt-dlp blocked by YouTube bot check — trying pytubefix fallback...",
               flush=True)
 

@@ -29,10 +29,11 @@ def main():
                              "browser. Use if YouTube serves the bot challenge on "
                              "Colab/cloud IPs. Optional — alternate player_client "
                              "workaround is applied by default.")
-    parser.add_argument("--yt-cookies-from-browser", default=None,
+    parser.add_argument("--yt-cookies-from-browser", default="auto",
                         help="Read YouTube cookies directly from a local browser "
-                             "(e.g. chrome, firefox, edge). Only works on machines "
-                             "where that browser is installed; not useful on Colab.")
+                             "(e.g. chrome, firefox, edge). Default: auto — use the "
+                             "first installed browser found, or none if no browser "
+                             "is installed (e.g. Colab). Pass 'none' to disable.")
     parser.add_argument("--vot-backend", choices=["tapa", "drvot"], default="tapa",
                         help="Stop-VOT backend: 'tapa' (Praat-based) or 'drvot' "
                              "(Dr.VOT CNN with per-token TAPA fallback). Default: tapa")

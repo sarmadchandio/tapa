@@ -49,11 +49,14 @@ class TAPAConfig:
     # at this bitrate (kbps, passed to yt-dlp's preferredquality).
     mp3_bitrate: str = "192"
 
-    # Optional cookies for yt-dlp. Use these if YouTube serves "Sign in to
-    # confirm you're not a bot" on Colab / cloud IPs. The default alternate
-    # player_client workaround handles most cases; cookies are belt-and-suspenders.
-    youtube_cookies_file: Optional[str] = None         # path to Netscape cookies.txt
-    youtube_cookies_from_browser: Optional[str] = None # e.g. "chrome", "firefox"
+    # Cookies for yt-dlp, used when YouTube serves "Sign in to confirm you're
+    # not a bot". cookies_from_browser defaults to "auto": read cookies from the
+    # first installed browser found (firefox, chrome, ...), or run cookieless
+    # when none is installed (e.g. Colab). Set to a browser name ("chrome",
+    # "firefox", ...) to force one, or None/"none" to disable. A cookies_file,
+    # if given, takes precedence over browser auto-detection.
+    youtube_cookies_file: Optional[str] = None          # path to Netscape cookies.txt
+    youtube_cookies_from_browser: Optional[str] = "auto"
 
     # VOT backend: "tapa" (Praat-based) or "drvot" (Dr.VOT CNN, with TAPA fallback)
     vot_backend: str = "tapa"

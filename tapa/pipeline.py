@@ -295,6 +295,14 @@ class TAPAPipeline:
         save_json(fric_data, os.path.join(results_dir, f"{stem}_fricative_spectra.json"))
         save_fricative_averages_csv(f_avg, os.path.join(results_dir, f"{stem}_fricative_averages.csv"))
 
+        # Record what actually ran, so a degraded run cannot look like a clean
+        # one. Written next to the results and returned to the caller.
+        summary = self._build_run_summary(
+            audio_path, segments, words, mfa_phones, align_report, stop_data,
+            v_avg, s_avg, f_avg)
+        save_json(summary, os.path.join(results_dir, f"{stem}_run_summary.json"))
+        self._report_degradations(summary)
+
         align_method = "MFA" if mfa_phones else "CMUdict"
         vot_method = "Dr.VOT (+ TAPA fallback)" if self.cfg.vot_backend == "drvot" else "TAPA-Praat"
         print(f"\n[DONE] {Path(audio_path).name}  "
@@ -310,6 +318,7 @@ class TAPAPipeline:
             shutil.rmtree(self.cfg.mfa_temp_dir, ignore_errors=True)
 
         return {
+            "run_summary": summary,
             "diarization": segments,
             "words": words,
             "vowel_data": vowel_data,
@@ -320,6 +329,82 @@ class TAPAPipeline:
             "fricative_averages": f_avg,
             "results_dir": results_dir,
         }
+
+    def _build_run_summary(self, audio_path, segments, words, mfa_phones,
+                           align_report, stop_data, v_avg, s_avg, f_avg):
+        """Machine-readable record of what actually ran, for provenance."""
+        vot_tokens = [t for spk in stop_data.values() for toks in spk.values()
+                      for t in toks]
+        by_method = {}
+        for t in vot_tokens:
+            m = t.get("vot_method", "tapa-praat")
+            by_method[m] = by_method.get(m, 0) + 1
+        requested_vot = self.cfg.vot_backend
+        drvot_ok = by_method.get("drvot", 0)
+        fallback = sum(n for m, n in by_method.items() if m != "drvot")
+
+        summary = {
+            "audio": os.path.basename(audio_path),
+            "requested": {
+                "vot_backend": requested_vot,
+                "alignment": "MFA" if self.mfa_available else "CMUdict",
+                "mfa_split_utterances": self.cfg.mfa_split_utterances,
+                "num_speakers": self.cfg.num_speakers,
+                "whisper_model": self.cfg.whisper_model,
+            },
+            "actual": {
+                "alignment": ("MFA (per-segment)" if mfa_phones and self.cfg.mfa_split_utterances
+                              else "MFA (single utterance)" if mfa_phones
+                              else "CMUdict proportional timing"),
+                "vot_methods": by_method,
+                "speakers": len(set(s["speaker"] for s in segments)),
+            },
+            "counts": {
+                "segments": len(segments),
+                "words": len(words),
+                "phones": len(mfa_phones) if mfa_phones else None,
+                "vot_tokens": len(vot_tokens),
+                "vowel_tokens": sum(d["n_tokens"] for spk in v_avg.values()
+                                    for d in spk.values()),
+                "fricative_tokens": sum(d["n_tokens"] for spk in f_avg.values()
+                                        for d in spk.values()),
+            },
+            "alignment_report": align_report,
+            "degradations": [],
+        }
+        if self.mfa_available and not mfa_phones:
+            summary["degradations"].append(
+                "MFA was available but produced no alignment; used CMUdict "
+                "proportional timing instead")
+        if requested_vot == "drvot" and vot_tokens and drvot_ok == 0:
+            summary["degradations"].append(
+                f"Dr.VOT was requested but every one of {fallback} tokens fell "
+                f"back to TAPA-Praat")
+        elif requested_vot == "drvot" and fallback > 0.2 * max(len(vot_tokens), 1):
+            summary["degradations"].append(
+                f"{fallback} of {len(vot_tokens)} VOT tokens fell back to "
+                f"TAPA-Praat")
+        if align_report and align_report.get("share", 0) > 0.10:
+            summary["degradations"].append(
+                f"{align_report['n_unaligned']} of {align_report['n_words']} words "
+                f"({align_report['share']:.1%}) had no phoneme alignment")
+        return summary
+
+    def _report_degradations(self, summary):
+        """Surface anything that silently degraded; raise when cfg.strict."""
+        problems = summary["degradations"]
+        if not problems:
+            print("[TAPA] Run summary: no degradations — every requested "
+                  "component ran as asked.", flush=True)
+            return
+        print("[TAPA] WARNING: this run did not do everything you asked:", flush=True)
+        for p in problems:
+            print(f"          * {p}", flush=True)
+        if self.cfg.strict:
+            raise RuntimeError(
+                "strict=True and the run degraded: " + "; ".join(problems))
+        print("          Set TAPAConfig(strict=True) to make this an error.",
+              flush=True)
 
     def run_batch(self, audio_dir=None, results_dir=None):
         """Run the pipeline on all audio files in a directory.

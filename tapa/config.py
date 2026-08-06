@@ -83,6 +83,13 @@ class TAPAConfig:
     youtube_cookies_file: Optional[str] = None          # path to Netscape cookies.txt
     youtube_cookies_from_browser: Optional[str] = "auto"
 
+    # Raise instead of quietly degrading. Off by default so a run always
+    # produces something, but every fallback has silently cost real analyses:
+    # MFA failing to CMUdict timing, or Dr.VOT failing to Praat for every
+    # token, while the run still reported success. Turn this on for anything
+    # whose numbers you intend to publish.
+    strict: bool = False
+
     # VOT backend: "tapa" (Praat-based) or "drvot" (Dr.VOT CNN, with TAPA fallback)
     vot_backend: str = "tapa"
     drvot_repo_dir: Optional[str] = None

@@ -141,8 +141,15 @@ def run_mfa_alignment(temp_dir, output_dir, cfg=None):
     cmd = [mfa_bin, "align", temp_dir, "english_us_arpa", "english_us_arpa",
            output_dir, "--clean", "--single_speaker",
            "--output_format", "long_textgrid", "--beam", "100", "--retry_beam", "400"]
+    # MFA shells out to OpenFst/Kaldi tools (fstcompile, ...) by bare name and
+    # they live next to the mfa binary — invoking mfa by absolute path (e.g.
+    # /opt/miniforge/bin/mfa on Colab) without its bin dir on PATH makes every
+    # alignment die with "Could not find 'fstcompile'".
+    env = os.environ.copy()
+    env["PATH"] = str(Path(mfa_bin).resolve().parent) + os.pathsep + env.get("PATH", "")
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800,
+                                env=env)
         if result.returncode != 0:
             print(f"    MFA failed: {result.stderr[-300:]}")
             return None

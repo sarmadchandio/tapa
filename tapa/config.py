@@ -36,6 +36,10 @@ class TAPAConfig:
     max_speakers: int = 8
     min_speaker_silhouette: float = 0.15
     min_segments_per_speaker: int = 4   # caps the estimate on short recordings
+
+    # Hard limit on a single MFA alignment. Exceeding it kills MFA's whole
+    # process group and falls back to CMUdict, rather than hanging forever.
+    mfa_timeout_s: int = 1800
     # When num_speakers is None the speaker count is estimated, which can split
     # one talker into several clusters. Set e.g. 0.02 to absorb any cluster
     # holding under 2 % of the speech into the nearest speaker. Prefer setting

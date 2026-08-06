@@ -3,6 +3,7 @@
 import os
 import re
 import shutil
+import signal
 import subprocess
 from pathlib import Path
 
@@ -195,6 +196,35 @@ def find_mfa_bin(cfg=None):
     return shutil.which("mfa")
 
 
+def _run_with_timeout(cmd, timeout_s, env):
+    """Run a command, killing its whole process group if it overruns.
+
+    subprocess.run(timeout=...) is not enough here. MFA starts worker
+    processes, and when the parent is killed those workers keep the stdout and
+    stderr pipes open, so the cleanup read after the timeout blocks forever —
+    the run hangs indefinitely instead of falling back. Observed in practice:
+    an alignment stuck for nearly an hour with a 30-minute timeout set. Running
+    the child in its own session lets us kill the group and stop waiting.
+
+    Returns (returncode, stderr). Raises subprocess.TimeoutExpired on overrun.
+    """
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, env=env, start_new_session=True)
+    try:
+        _, stderr = proc.communicate(timeout=timeout_s)
+        return proc.returncode, stderr or ""
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            proc.kill()
+        try:                       # reap; the group is gone so this returns
+            proc.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            pass
+        raise
+
+
 def run_mfa_alignment(temp_dir, output_dir, cfg=None):
     """Run MFA alignment. Returns TextGrid path or None on failure."""
     if cfg is None:
@@ -215,13 +245,16 @@ def run_mfa_alignment(temp_dir, output_dir, cfg=None):
     env = os.environ.copy()
     env["PATH"] = str(Path(mfa_bin).resolve().parent) + os.pathsep + env.get("PATH", "")
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800,
-                                env=env)
-        if result.returncode != 0:
-            print(f"    MFA failed: {result.stderr[-300:]}")
+        returncode, stderr = _run_with_timeout(cmd, cfg.mfa_timeout_s, env)
+        if returncode != 0:
+            print(f"    MFA failed (exit {returncode}): {stderr[-300:]}")
             return None
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except FileNotFoundError:
         print("    MFA error -- falling back to CMUdict")
+        return None
+    except subprocess.TimeoutExpired:
+        print(f"    MFA exceeded {cfg.mfa_timeout_s}s and was killed "
+              f"-- falling back to CMUdict")
         return None
     tg_files = list(Path(output_dir).glob("*.TextGrid"))
     return str(tg_files[0]) if tg_files else None

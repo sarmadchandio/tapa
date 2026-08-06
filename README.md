@@ -167,6 +167,20 @@ results = pipeline.run("/content/my_recording.mp3")
 > `/content/cookies.txt` automatically. Full walkthrough in
 > [Common issues](#common-issues).
 
+> **Note — YouTube cookies are used by default.** YouTube increasingly
+> blocks anonymous downloads, so TAPA looks for cookies automatically: first
+> a `cookies.txt` file (`$TAPA_YT_COOKIES`, the working directory,
+> `/content`, or `~`), then, on a machine that has a browser installed, that
+> browser's own YouTube cookies. **If you are logged in, these are your
+> account's cookies, and YouTube sees the download as coming from your
+> account.** Cookies are read locally and sent only to YouTube as part of
+> the download request — TAPA never stores, copies, or transmits them
+> anywhere else. To turn this off, pass
+> `TAPAConfig(youtube_cookies_from_browser="none")` (CLI:
+> `--yt-cookies-from-browser none`); to use a specific file instead, pass
+> `youtube_cookies_file="/path/to/cookies.txt"` (CLI: `--yt-cookies`).
+> Analysing a local audio file never touches YouTube or cookies at all.
+
 Result CSVs and JSONs land in `./results/`. The video ID (or local
 filename) becomes the stem, so for the URL above you'll get
 `DPO7imV0LHg_diarization.csv`, `DPO7imV0LHg_vowel_averages.csv`, etc.

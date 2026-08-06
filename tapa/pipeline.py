@@ -16,7 +16,9 @@ from .alignment import (
     parse_textgrids_dir,
     prepare_mfa_input,
     prepare_mfa_input_segmented,
+    print_alignment_report,
     run_mfa_alignment,
+    summarize_alignment,
 )
 from .audio import load_audio_16k
 from .config import TAPAConfig
@@ -26,6 +28,7 @@ from .diarization import (
     get_speech_segments,
     load_silero_vad,
     save_diarization_csv,
+    speaker_summary,
 )
 from .download import download_youtube_audio, is_youtube_url
 from .drvot import extract_all_stop_measurements_drvot
@@ -182,6 +185,21 @@ class TAPAPipeline:
         segments = assign_speakers(vad_segs, audio_np, wav_sr, self.voice_encoder, self.cfg)
         speakers = set(s["speaker"] for s in segments)
         print(f"          -> {len(segments)} segments / {len(speakers)} speaker(s)", flush=True)
+        summary = speaker_summary(segments)
+        for spk, st in summary.items():
+            print(f"             {spk}: {st['seconds']/60:5.1f} min ({st['share']:.1%}), "
+                  f"{st['segments']} segments", flush=True)
+        # Auto-estimated counts can split one talker in two; a sliver-sized
+        # speaker is the usual symptom, so point at the reliable fix.
+        if self.cfg.num_speakers is None and len(summary) > 1:
+            smallest = min(summary.values(), key=lambda v: v["share"])
+            if smallest["share"] < 0.05:
+                print("             note: a speaker holds under 5% of the speech, which "
+                      "often means one talker was split.\n"
+                      "             If you know the true count, set "
+                      "TAPAConfig(num_speakers=N) (CLI: --num-speakers N),\n"
+                      "             or set min_speaker_share to absorb slivers "
+                      "automatically.", flush=True)
         diar_path = os.path.join(results_dir, f"{stem}_diarization.csv")
         save_diarization_csv(segments, diar_path)
 
@@ -195,6 +213,7 @@ class TAPAPipeline:
         # Step 3: Forced alignment (MFA primary, CMUdict fallback)
         tg_path = None
         mfa_phones = None
+        align_report = None
         if self.mfa_available:
             split = self.cfg.mfa_split_utterances
             print("[STEP 3/6] Forced alignment (PRIMARY: Montreal Forced Aligner, "
@@ -221,7 +240,9 @@ class TAPAPipeline:
                     tg_dest = os.path.join(results_dir, f"{stem}_aligned.TextGrid")
                     shutil.copy2(tg_path, tg_dest)
                     print("          -> MFA TextGrid saved", flush=True)
-            if not tg_path:
+            if tg_path:
+                align_report = summarize_alignment(mfa_out)
+            else:
                 print("          -> MFA produced no TextGrid; using CMUdict fallback", flush=True)
         else:
             print("[STEP 3/6] Forced alignment (FALLBACK: CMUdict proportional, MFA unavailable)...",
@@ -229,6 +250,11 @@ class TAPAPipeline:
 
         # Step 4: Identify phoneme segments
         print("[STEP 4/6] Identifying phoneme segments...", flush=True)
+        print_alignment_report(
+            align_report,
+            ("MFA (per-segment utterances)" if self.cfg.mfa_split_utterances
+             else "MFA (single utterance)") if mfa_phones
+            else "CMUdict proportional timing (approximate — MFA did not run)")
         if mfa_phones:
             print(f"          source: MFA  ({len(mfa_phones)} phones)", flush=True)
             sp_v, sp_s, sp_f = identify_segments_from_mfa(mfa_phones, segments, self.cfg)

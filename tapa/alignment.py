@@ -116,6 +116,72 @@ def parse_textgrids_dir(output_dir, offsets):
     return phones
 
 
+UNALIGNED_LABELS = {"spn", "sil", "sp", ""}
+
+
+def summarize_alignment(output_dir):
+    """Count words MFA could not convert to phonemes, across all TextGrids.
+
+    MFA labels a word it cannot look up (or generate a pronunciation for) as
+    ``spn``. Those words contribute no phonemes, so they silently vanish from
+    every downstream measurement — this reports how many there were.
+
+    Returns dict with n_words, n_unaligned, share, types (sorted word list),
+    and oov_file (MFA's own OOV list, when it wrote one).
+    """
+    n_words = 0
+    unaligned = []
+    for tg_path in sorted(Path(output_dir).rglob("*.TextGrid")):
+        try:
+            tg = tgio.openTextgrid(str(tg_path), includeEmptyIntervals=True)
+        except Exception:
+            continue
+        names = {n.lower(): n for n in tg.tierNames}
+        w_tier = next((names[n] for n in names if "word" in n), None)
+        p_tier = next((names[n] for n in names if "phone" in n), None)
+        if w_tier is None or p_tier is None:
+            continue
+        phones = [(float(i.start), float(i.end), i.label.strip())
+                  for i in tg.getTier(p_tier).entries]
+        for iv in tg.getTier(w_tier).entries:
+            word = iv.label.strip()
+            if not word or word in UNALIGNED_LABELS:
+                continue
+            n_words += 1
+            ws, we = float(iv.start), float(iv.end)
+            inside = [lab for s, e, lab in phones if s >= ws - 1e-6 and e <= we + 1e-6]
+            if not any(lab and lab not in UNALIGNED_LABELS for lab in inside):
+                unaligned.append(word)
+
+    oov_file = next((str(p) for p in Path(output_dir).parent.rglob("oovs_found*.txt")), None)
+    return {
+        "n_words": n_words,
+        "n_unaligned": len(unaligned),
+        "share": (len(unaligned) / n_words) if n_words else 0.0,
+        "types": sorted(set(unaligned)),
+        "oov_file": oov_file,
+    }
+
+
+def print_alignment_report(report, method):
+    """Print the alignment method and out-of-vocabulary summary."""
+    print(f"          -> alignment method: {method}", flush=True)
+    if report is None or not report["n_words"]:
+        return
+    n, tot, share = report["n_unaligned"], report["n_words"], report["share"]
+    if n:
+        types = report["types"]
+        shown = ", ".join(types[:12]) + (" ..." if len(types) > 12 else "")
+        print(f"          -> {n} of {tot} words ({share:.1%}) received no phoneme-level "
+              f"alignment (out-of-vocabulary); they are excluded from all measurements",
+              flush=True)
+        print(f"             {len(types)} distinct word type(s): {shown}", flush=True)
+        if report["oov_file"]:
+            print(f"             MFA's own OOV list: {report['oov_file']}", flush=True)
+    else:
+        print(f"          -> all {tot} words received phoneme-level alignment", flush=True)
+
+
 def find_mfa_bin(cfg=None):
     """Locate the MFA binary."""
     if cfg is None:

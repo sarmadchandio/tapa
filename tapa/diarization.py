@@ -71,6 +71,9 @@ def assign_speakers(segments, audio_np_16k, sr, voice_encoder, cfg=None):
     Z = linkage(dists, method="ward")
     labels = (fcluster(Z, t=cfg.num_speakers, criterion="maxclust") if cfg.num_speakers
               else fcluster(Z, t=1.5, criterion="distance"))
+    if cfg.min_speaker_share > 0:
+        labels = _absorb_small_clusters(labels, embs, segments, valid_idx, cfg)
+
     lmap = {}
     labeled = []
     for idx, vi in enumerate(valid_idx):
@@ -85,6 +88,59 @@ def assign_speakers(segments, audio_np_16k, sr, voice_encoder, cfg=None):
             labeled.append({"speaker": nearest["speaker"], **seg})
     labeled.sort(key=lambda s: s["start"])
     return _merge_segments(labeled, cfg)
+
+
+def _absorb_small_clusters(labels, embs, segments, valid_idx, cfg):
+    """Reassign clusters holding less than cfg.min_speaker_share of the speech.
+
+    Automatic speaker-count estimation can split one talker into several
+    clusters when their voice varies (loudness, laughter, channel changes).
+    Such spurious clusters are typically tiny; each of their segments is moved
+    to the nearest surviving cluster by cosine distance between the segment's
+    embedding and the cluster centroid. Off by default (share = 0).
+    """
+    labels = np.asarray(labels).copy()
+    durations = {}
+    for idx, vi in enumerate(valid_idx):
+        seg = segments[vi]
+        durations[int(labels[idx])] = durations.get(int(labels[idx]), 0.0) + (seg["end"] - seg["start"])
+    total = sum(durations.values())
+    if total <= 0:
+        return labels
+    small = {c for c, d in durations.items() if d / total < cfg.min_speaker_share}
+    keep = [c for c in durations if c not in small]
+    if not small or not keep:
+        return labels
+
+    centroids = {}
+    for c in keep:
+        rows = embs[labels == c]
+        v = rows.mean(axis=0)
+        n = np.linalg.norm(v)
+        centroids[c] = v / n if n else v
+    for idx in range(len(labels)):
+        if int(labels[idx]) not in small:
+            continue
+        e = embs[idx]
+        n = np.linalg.norm(e)
+        e = e / n if n else e
+        labels[idx] = max(keep, key=lambda c: float(np.dot(e, centroids[c])))
+    print(f"[TAPA] Merged {len(small)} speaker cluster(s) holding less than "
+          f"{cfg.min_speaker_share:.0%} of speech into the nearest speaker.", flush=True)
+    return labels
+
+
+def speaker_summary(segments):
+    """Per-speaker speech time and segment count, longest first."""
+    stats = {}
+    for s in segments:
+        d = stats.setdefault(s["speaker"], {"seconds": 0.0, "segments": 0})
+        d["seconds"] += s["end"] - s["start"]
+        d["segments"] += 1
+    total = sum(v["seconds"] for v in stats.values()) or 1.0
+    for v in stats.values():
+        v["share"] = v["seconds"] / total
+    return dict(sorted(stats.items(), key=lambda kv: -kv[1]["seconds"]))
 
 
 def _merge_segments(segments, cfg):

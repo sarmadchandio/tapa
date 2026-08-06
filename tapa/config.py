@@ -30,6 +30,11 @@ class TAPAConfig:
 
     # Diarization
     num_speakers: Optional[int] = None
+    # When num_speakers is None the speaker count is estimated, which can split
+    # one talker into several clusters. Set e.g. 0.02 to absorb any cluster
+    # holding under 2 % of the speech into the nearest speaker. Prefer setting
+    # num_speakers when the true count is known — that is always more reliable.
+    min_speaker_share: float = 0.0
     min_segment_duration: float = 0.1
     merge_gap: float = 0.5
 

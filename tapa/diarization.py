@@ -119,7 +119,12 @@ def _silhouette(D, labels):
     means[rows, own] = np.inf                       # nearest *other* cluster
     b = means.min(axis=1)
     denom = np.maximum(a, b)
-    return float(np.where(denom > 0, (b - a) / denom, 0.0).mean())
+    s = np.where(denom > 0, (b - a) / denom, 0.0)
+    # A cluster of one has no within-cluster distance, which would otherwise
+    # score a perfect 1.0 and make "every segment is its own speaker" look
+    # ideal. By convention singletons score 0.
+    s[own_cnt == 0] = 0.0
+    return float(s.mean())
 
 
 def _estimate_num_speakers(Z, D, cfg):
@@ -133,7 +138,10 @@ def _estimate_num_speakers(Z, D, cfg):
     min_speaker_silhouette no split is convincing and we report one speaker.
     """
     best_k, best_score = 1, -1.0
-    kmax = min(cfg.max_speakers, len(D) - 1)
+    # Each speaker needs a few segments before a split means anything; without
+    # this a short recording with a handful of segments can be carved into as
+    # many "speakers" as it has segments.
+    kmax = min(cfg.max_speakers, len(D) // cfg.min_segments_per_speaker)
     for k in range(2, kmax + 1):
         labels = fcluster(Z, t=k, criterion="maxclust")
         if len(np.unique(labels)) < 2:

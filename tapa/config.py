@@ -35,6 +35,7 @@ class TAPAConfig:
     # min_speaker_silhouette the recording is treated as a single speaker.
     max_speakers: int = 8
     min_speaker_silhouette: float = 0.15
+    min_segments_per_speaker: int = 4   # caps the estimate on short recordings
     # When num_speakers is None the speaker count is estimated, which can split
     # one talker into several clusters. Set e.g. 0.02 to absorb any cluster
     # holding under 2 % of the speech into the nearest speaker. Prefer setting

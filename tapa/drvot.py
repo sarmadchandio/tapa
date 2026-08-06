@@ -147,6 +147,16 @@ def setup_drvot(repo_dir: str | os.PathLike, force: bool = False) -> str:
     # as a praatio traceback several minutes into feature extraction.
     _verify_praat(praat_path)
 
+    # Dr.VOT's feature extractor shells out to sox. Without it phase 4 dies
+    # with a bare "/bin/sh: 1: sox: not found" and every token silently falls
+    # back to the Praat estimator, so check for it here.
+    if shutil.which("sox") is None:
+        _log("WARNING: 'sox' is not on PATH — Dr.VOT's feature extraction will "
+             "fail and every token will fall back to TAPA-Praat. "
+             "Install it: apt-get install -y sox  (or: conda install -c conda-forge sox)")
+    else:
+        _log(f"found sox: {shutil.which('sox')}")
+
     return str(repo)
 
 

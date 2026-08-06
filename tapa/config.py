@@ -23,6 +23,10 @@ class TAPAConfig:
     # long recordings — so keep this on unless debugging alignment itself.
     mfa_split_utterances: bool = True
     mfa_utterance_pad: float = 0.25  # seconds of context around each utterance
+    # MFA worker processes. MFA's default (3) costs ~2-3 GB RAM apiece in
+    # corpus mode; on Colab (2 vCPUs, ~12.7 GB RAM) extra workers add memory
+    # pressure without speed. Raise on real multi-core machines.
+    mfa_num_jobs: int = 2
 
     # Diarization
     num_speakers: Optional[int] = None

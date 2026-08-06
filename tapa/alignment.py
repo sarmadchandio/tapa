@@ -140,6 +140,7 @@ def run_mfa_alignment(temp_dir, output_dir, cfg=None):
         return None
     cmd = [mfa_bin, "align", temp_dir, "english_us_arpa", "english_us_arpa",
            output_dir, "--clean", "--single_speaker",
+           "--num_jobs", str(cfg.mfa_num_jobs),
            "--output_format", "long_textgrid", "--beam", "100", "--retry_beam", "400"]
     # MFA shells out to OpenFst/Kaldi tools (fstcompile, ...) by bare name and
     # they live next to the mfa binary — invoking mfa by absolute path (e.g.

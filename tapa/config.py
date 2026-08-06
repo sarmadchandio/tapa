@@ -30,6 +30,11 @@ class TAPAConfig:
 
     # Diarization
     num_speakers: Optional[int] = None
+    # When num_speakers is None the count is estimated by picking the
+    # silhouette-best clustering between 2 and max_speakers. If no split beats
+    # min_speaker_silhouette the recording is treated as a single speaker.
+    max_speakers: int = 8
+    min_speaker_silhouette: float = 0.15
     # When num_speakers is None the speaker count is estimated, which can split
     # one talker into several clusters. Set e.g. 0.02 to absorb any cluster
     # holding under 2 % of the speech into the nearest speaker. Prefer setting

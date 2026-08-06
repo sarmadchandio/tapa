@@ -5,7 +5,7 @@ import csv
 import numpy as np
 import torch
 from scipy.cluster.hierarchy import fcluster, linkage
-from scipy.spatial.distance import pdist
+from scipy.spatial.distance import pdist, squareform
 
 from .audio import load_audio_16k
 from .config import TAPAConfig
@@ -67,10 +67,19 @@ def assign_speakers(segments, audio_np_16k, sr, voice_encoder, cfg=None):
     if len(embeddings) < 2:
         return [{"speaker": "SPEAKER_00", **s} for s in segments]
     embs = np.array(embeddings)
-    dists = pdist(embs, metric="cosine")
+    # Ward is defined for Euclidean distances; Resemblyzer embeddings are
+    # unit-norm, where squared Euclidean is just 2x cosine distance, so this
+    # keeps the geometry and makes the linkage valid.
+    dists = pdist(embs, metric="euclidean")
     Z = linkage(dists, method="ward")
-    labels = (fcluster(Z, t=cfg.num_speakers, criterion="maxclust") if cfg.num_speakers
-              else fcluster(Z, t=1.5, criterion="distance"))
+    if cfg.num_speakers:
+        labels = fcluster(Z, t=cfg.num_speakers, criterion="maxclust")
+    else:
+        k, score = _estimate_num_speakers(Z, squareform(dists), cfg)
+        labels = (fcluster(Z, t=k, criterion="maxclust") if k > 1
+                  else np.ones(len(embs), dtype=int))
+        print(f"[TAPA] Estimated {k} speaker(s) (silhouette {score:+.2f}). "
+              f"Pass num_speakers=N if you know the true count.", flush=True)
     if cfg.min_speaker_share > 0:
         labels = _absorb_small_clusters(labels, embs, segments, valid_idx, cfg)
 
@@ -88,6 +97,53 @@ def assign_speakers(segments, audio_np_16k, sr, voice_encoder, cfg=None):
             labeled.append({"speaker": nearest["speaker"], **seg})
     labeled.sort(key=lambda s: s["start"])
     return _merge_segments(labeled, cfg)
+
+
+def _silhouette(D, labels):
+    """Mean silhouette coefficient for a labelling, from a distance matrix."""
+    uniq = np.unique(labels)
+    if len(uniq) < 2:
+        return -1.0
+    n = len(labels)
+    sums = np.empty((n, len(uniq)))
+    counts = np.empty(len(uniq))
+    for j, lab in enumerate(uniq):
+        mask = labels == lab
+        counts[j] = mask.sum()
+        sums[:, j] = D[:, mask].sum(axis=1)
+    own = np.searchsorted(uniq, labels)
+    rows = np.arange(n)
+    own_cnt = counts[own] - 1                       # exclude the point itself
+    a = np.where(own_cnt > 0, sums[rows, own] / np.maximum(own_cnt, 1), 0.0)
+    means = sums / counts[None, :]
+    means[rows, own] = np.inf                       # nearest *other* cluster
+    b = means.min(axis=1)
+    denom = np.maximum(a, b)
+    return float(np.where(denom > 0, (b - a) / denom, 0.0).mean())
+
+
+def _estimate_num_speakers(Z, D, cfg):
+    """Pick the speaker count by silhouette score; returns (k, score).
+
+    A fixed distance cut cannot be used here: Ward merge heights grow with
+    cluster size, so the same threshold yields more and more clusters as a
+    recording lengthens — a 2 h recording was split into 8 speakers where the
+    same audio at 20 min gave 2. Silhouette compares labellings on a scale-free
+    basis, so its answer does not drift with recording length. Below
+    min_speaker_silhouette no split is convincing and we report one speaker.
+    """
+    best_k, best_score = 1, -1.0
+    kmax = min(cfg.max_speakers, len(D) - 1)
+    for k in range(2, kmax + 1):
+        labels = fcluster(Z, t=k, criterion="maxclust")
+        if len(np.unique(labels)) < 2:
+            continue
+        score = _silhouette(D, labels)
+        if score > best_score:
+            best_score, best_k = score, k
+    if best_score < cfg.min_speaker_silhouette:
+        return 1, best_score
+    return best_k, best_score
 
 
 def _absorb_small_clusters(labels, embs, segments, valid_idx, cfg):

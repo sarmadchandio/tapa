@@ -5,14 +5,22 @@ import shutil
 import warnings
 from pathlib import Path
 
-import librosa
 import nltk
-import numpy as np
 import torch
 import whisper
 from resemblyzer import VoiceEncoder
 
-from .alignment import find_mfa_bin, parse_textgrid, prepare_mfa_input, run_mfa_alignment
+from .alignment import (
+    find_mfa_bin,
+    parse_textgrid,
+    parse_textgrids_dir,
+    prepare_mfa_input,
+    prepare_mfa_input_segmented,
+    print_alignment_report,
+    run_mfa_alignment,
+    summarize_alignment,
+)
+from .audio import load_audio_16k
 from .config import TAPAConfig
 from .consonants import extract_all_fricative_measurements, extract_all_stop_measurements
 from .diarization import (
@@ -20,6 +28,7 @@ from .diarization import (
     get_speech_segments,
     load_silero_vad,
     save_diarization_csv,
+    speaker_summary,
 )
 from .download import download_youtube_audio, is_youtube_url
 from .drvot import extract_all_stop_measurements_drvot
@@ -162,36 +171,77 @@ class TAPAPipeline:
         print(f"Processing: {Path(audio_path).name}", flush=True)
         print(f"{'='*60}", flush=True)
 
+        # Decode once at 16 kHz mono; every stage below shares this buffer.
+        # (Decoding natively and resampling in-process peaks at several GB for
+        # multi-hour recordings — the old behavior that OOM'd Colab.)
+        print("[TAPA] Decoding audio (16 kHz mono)...", flush=True)
+        audio_np = load_audio_16k(audio_path, self.cfg.sample_rate)
+        print(f"       -> {len(audio_np) / self.cfg.sample_rate / 60:.1f} min", flush=True)
+
         # Step 1: Diarization
         print("[STEP 1/6] Diarization (VAD + Resemblyzer clustering)...", flush=True)
-        vad_segs, wav_t, wav_sr = get_speech_segments(
-            audio_path, self.vad_model, self.get_speech_timestamps, self.cfg)
-        wav_np = wav_t.numpy().astype(np.float32)
-        segments = assign_speakers(vad_segs, wav_np, wav_sr, self.voice_encoder, self.cfg)
+        vad_segs, _, wav_sr = get_speech_segments(
+            audio_np, self.vad_model, self.get_speech_timestamps, self.cfg)
+        segments = assign_speakers(vad_segs, audio_np, wav_sr, self.voice_encoder, self.cfg)
         speakers = set(s["speaker"] for s in segments)
         print(f"          -> {len(segments)} segments / {len(speakers)} speaker(s)", flush=True)
+        summary = speaker_summary(segments)
+        for spk, st in summary.items():
+            print(f"             {spk}: {st['seconds']/60:5.1f} min ({st['share']:.1%}), "
+                  f"{st['segments']} segments", flush=True)
+        # Auto-estimated counts can split one talker in two; a sliver-sized
+        # speaker is the usual symptom, so point at the reliable fix.
+        if self.cfg.num_speakers is None and len(summary) > 1:
+            smallest = min(summary.values(), key=lambda v: v["share"])
+            if smallest["share"] < 0.05:
+                print("             note: a speaker holds under 5% of the speech, which "
+                      "often means one talker was split.\n"
+                      "             If you know the true count, set "
+                      "TAPAConfig(num_speakers=N) (CLI: --num-speakers N),\n"
+                      "             or set min_speaker_share to absorb slivers "
+                      "automatically.", flush=True)
         diar_path = os.path.join(results_dir, f"{stem}_diarization.csv")
         save_diarization_csv(segments, diar_path)
 
         # Step 2: Transcription
         print("[STEP 2/6] Transcription (Whisper)...", flush=True)
-        words = transcribe_audio(audio_path, self.whisper_model)
+        words = transcribe_audio(audio_np, self.whisper_model)
         print(f"          -> {len(words)} words", flush=True)
         trans_path = os.path.join(results_dir, f"{stem}_transcription.csv")
         save_transcription(words, segments, trans_path)
 
         # Step 3: Forced alignment (MFA primary, CMUdict fallback)
         tg_path = None
+        mfa_phones = None
+        align_report = None
         if self.mfa_available:
-            print("[STEP 3/6] Forced alignment (PRIMARY: Montreal Forced Aligner)...", flush=True)
+            split = self.cfg.mfa_split_utterances
+            print("[STEP 3/6] Forced alignment (PRIMARY: Montreal Forced Aligner, "
+                  + ("per-segment utterances" if split else "single utterance") + ")...",
+                  flush=True)
             mfa_in = os.path.join(self.cfg.mfa_temp_dir, stem)
             mfa_out = os.path.join(self.cfg.mfa_temp_dir, f"{stem}_aligned")
-            prepare_mfa_input(audio_path, words, mfa_in, self.cfg)
-            tg_path = run_mfa_alignment(mfa_in, mfa_out, self.cfg)
+            if split:
+                offsets = prepare_mfa_input_segmented(
+                    audio_path, words, segments, mfa_in, self.cfg, audio_np=audio_np)
+                tg_path = run_mfa_alignment(mfa_in, mfa_out, self.cfg)
+                if tg_path:
+                    mfa_phones = parse_textgrids_dir(mfa_out, offsets)
+                    tg_dest = os.path.join(results_dir, f"{stem}_aligned_textgrids")
+                    shutil.rmtree(tg_dest, ignore_errors=True)
+                    shutil.copytree(mfa_out, tg_dest)
+                    print(f"          -> {len(offsets)} utterances aligned; TextGrids saved",
+                          flush=True)
+            else:
+                prepare_mfa_input(audio_path, words, mfa_in, self.cfg, audio_np=audio_np)
+                tg_path = run_mfa_alignment(mfa_in, mfa_out, self.cfg)
+                if tg_path:
+                    mfa_phones = parse_textgrid(tg_path)
+                    tg_dest = os.path.join(results_dir, f"{stem}_aligned.TextGrid")
+                    shutil.copy2(tg_path, tg_dest)
+                    print("          -> MFA TextGrid saved", flush=True)
             if tg_path:
-                tg_dest = os.path.join(results_dir, f"{stem}_aligned.TextGrid")
-                shutil.copy2(tg_path, tg_dest)
-                print("          -> MFA TextGrid saved", flush=True)
+                align_report = summarize_alignment(mfa_out)
             else:
                 print("          -> MFA produced no TextGrid; using CMUdict fallback", flush=True)
         else:
@@ -200,10 +250,14 @@ class TAPAPipeline:
 
         # Step 4: Identify phoneme segments
         print("[STEP 4/6] Identifying phoneme segments...", flush=True)
-        if tg_path:
-            phones = parse_textgrid(tg_path)
-            print(f"          source: MFA  ({len(phones)} phones)", flush=True)
-            sp_v, sp_s, sp_f = identify_segments_from_mfa(phones, segments, self.cfg)
+        print_alignment_report(
+            align_report,
+            ("MFA (per-segment utterances)" if self.cfg.mfa_split_utterances
+             else "MFA (single utterance)") if mfa_phones
+            else "CMUdict proportional timing (approximate — MFA did not run)")
+        if mfa_phones:
+            print(f"          source: MFA  ({len(mfa_phones)} phones)", flush=True)
+            sp_v, sp_s, sp_f = identify_segments_from_mfa(mfa_phones, segments, self.cfg)
         else:
             print("          source: CMUdict proportional timing", flush=True)
             sp_v, sp_s, sp_f = identify_segments_from_cmudict(words, segments, self.cmudict, self.cfg)
@@ -213,10 +267,7 @@ class TAPAPipeline:
         nf = sum(len(v) for v in sp_f.values())
         print(f"          -> {nv} vowels, {ns} stops, {nf} fricatives", flush=True)
 
-        # Step 5: Acoustic measurements
-        print("[STEP 5/6] Loading audio for acoustic analysis...", flush=True)
-        audio_np, _ = librosa.load(audio_path, sr=self.cfg.sample_rate)
-
+        # Step 5: Acoustic measurements (reuses the audio decoded up front)
         print("[STEP 5a]  Vowel formants (TAPA / Praat)...", flush=True)
         vowel_data = extract_all_vowel_formants(sp_v, audio_np, self.cfg)
 
@@ -244,7 +295,15 @@ class TAPAPipeline:
         save_json(fric_data, os.path.join(results_dir, f"{stem}_fricative_spectra.json"))
         save_fricative_averages_csv(f_avg, os.path.join(results_dir, f"{stem}_fricative_averages.csv"))
 
-        align_method = "MFA" if tg_path else "CMUdict"
+        # Record what actually ran, so a degraded run cannot look like a clean
+        # one. Written next to the results and returned to the caller.
+        summary = self._build_run_summary(
+            audio_path, segments, words, mfa_phones, align_report, stop_data,
+            v_avg, s_avg, f_avg)
+        save_json(summary, os.path.join(results_dir, f"{stem}_run_summary.json"))
+        self._report_degradations(summary)
+
+        align_method = "MFA" if mfa_phones else "CMUdict"
         vot_method = "Dr.VOT (+ TAPA fallback)" if self.cfg.vot_backend == "drvot" else "TAPA-Praat"
         print(f"\n[DONE] {Path(audio_path).name}  "
               f"alignment={align_method}, vot_backend={vot_method}", flush=True)
@@ -259,6 +318,7 @@ class TAPAPipeline:
             shutil.rmtree(self.cfg.mfa_temp_dir, ignore_errors=True)
 
         return {
+            "run_summary": summary,
             "diarization": segments,
             "words": words,
             "vowel_data": vowel_data,
@@ -269,6 +329,82 @@ class TAPAPipeline:
             "fricative_averages": f_avg,
             "results_dir": results_dir,
         }
+
+    def _build_run_summary(self, audio_path, segments, words, mfa_phones,
+                           align_report, stop_data, v_avg, s_avg, f_avg):
+        """Machine-readable record of what actually ran, for provenance."""
+        vot_tokens = [t for spk in stop_data.values() for toks in spk.values()
+                      for t in toks]
+        by_method = {}
+        for t in vot_tokens:
+            m = t.get("vot_method", "tapa-praat")
+            by_method[m] = by_method.get(m, 0) + 1
+        requested_vot = self.cfg.vot_backend
+        drvot_ok = by_method.get("drvot", 0)
+        fallback = sum(n for m, n in by_method.items() if m != "drvot")
+
+        summary = {
+            "audio": os.path.basename(audio_path),
+            "requested": {
+                "vot_backend": requested_vot,
+                "alignment": "MFA" if self.mfa_available else "CMUdict",
+                "mfa_split_utterances": self.cfg.mfa_split_utterances,
+                "num_speakers": self.cfg.num_speakers,
+                "whisper_model": self.cfg.whisper_model,
+            },
+            "actual": {
+                "alignment": ("MFA (per-segment)" if mfa_phones and self.cfg.mfa_split_utterances
+                              else "MFA (single utterance)" if mfa_phones
+                              else "CMUdict proportional timing"),
+                "vot_methods": by_method,
+                "speakers": len(set(s["speaker"] for s in segments)),
+            },
+            "counts": {
+                "segments": len(segments),
+                "words": len(words),
+                "phones": len(mfa_phones) if mfa_phones else None,
+                "vot_tokens": len(vot_tokens),
+                "vowel_tokens": sum(d["n_tokens"] for spk in v_avg.values()
+                                    for d in spk.values()),
+                "fricative_tokens": sum(d["n_tokens"] for spk in f_avg.values()
+                                        for d in spk.values()),
+            },
+            "alignment_report": align_report,
+            "degradations": [],
+        }
+        if self.mfa_available and not mfa_phones:
+            summary["degradations"].append(
+                "MFA was available but produced no alignment; used CMUdict "
+                "proportional timing instead")
+        if requested_vot == "drvot" and vot_tokens and drvot_ok == 0:
+            summary["degradations"].append(
+                f"Dr.VOT was requested but every one of {fallback} tokens fell "
+                f"back to TAPA-Praat")
+        elif requested_vot == "drvot" and fallback > 0.2 * max(len(vot_tokens), 1):
+            summary["degradations"].append(
+                f"{fallback} of {len(vot_tokens)} VOT tokens fell back to "
+                f"TAPA-Praat")
+        if align_report and align_report.get("share", 0) > 0.10:
+            summary["degradations"].append(
+                f"{align_report['n_unaligned']} of {align_report['n_words']} words "
+                f"({align_report['share']:.1%}) had no phoneme alignment")
+        return summary
+
+    def _report_degradations(self, summary):
+        """Surface anything that silently degraded; raise when cfg.strict."""
+        problems = summary["degradations"]
+        if not problems:
+            print("[TAPA] Run summary: no degradations — every requested "
+                  "component ran as asked.", flush=True)
+            return
+        print("[TAPA] WARNING: this run did not do everything you asked:", flush=True)
+        for p in problems:
+            print(f"          * {p}", flush=True)
+        if self.cfg.strict:
+            raise RuntimeError(
+                "strict=True and the run degraded: " + "; ".join(problems))
+        print("          Set TAPAConfig(strict=True) to make this an error.",
+              flush=True)
 
     def run_batch(self, audio_dir=None, results_dir=None):
         """Run the pipeline on all audio files in a directory.

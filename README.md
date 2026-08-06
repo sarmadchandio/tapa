@@ -12,10 +12,16 @@ they say, and extracts detailed acoustic measurements per speaker.
    proportional fallback when MFA isn't installed)
 4. **Vowel formants** — F1, F2, and pitch for each vowel token
 5. **Stop consonant VOT** — Voice Onset Time. Backend is selectable:
-   - `"tapa"` (default) — Praat-based signal heuristic; fast, deterministic
    - `"drvot"` — Dr.VOT, a neural-network model (Shrem et al. 2019); handles
      negative VOT (prevoicing); slower; with automatic per-token TAPA fallback
-     for stops it can't predict
+     for stops it can't predict. **Use this for any VOT result you intend to
+     report**, and pair it with MFA — see the warning below.
+   - `"tapa"` (default) — Praat-based signal heuristic; fast, deterministic,
+     and needs no setup, but unreliable on conversational speech: measured on
+     a 2-minute sample it returned a median of 0.5 ms for both voiceless and
+     voiced stops, with roughly 70 % of tokens at that floor, where Dr.VOT
+     gave 22 ms and 16 ms on the same audio. It remains the default only
+     because it requires no extra installation.
 6. **Fricative spectral moments** — Center of Gravity, spectral SD, skewness,
    kurtosis
 7. **Per-speaker averages** — summary statistics with outlier rejection
@@ -42,6 +48,19 @@ Inputs accepted: local `.mp3` / `.wav` / `.flac` files, **and YouTube URLs**
   table below.
 
 ---
+
+## Tutorial notebook
+
+The fastest way in is the tutorial notebook, which runs end to end in Colab
+with no local setup, explains each stage, and walks through every output file:
+
+**[Open the tutorial in Colab](https://colab.research.google.com/github/sarmadchandio/tapa/blob/master/notebooks/tapa_tutorial.ipynb)**
+ · [view the notebook](notebooks/tapa_tutorial.ipynb)
+
+It is preset-driven — `quick` for a two-minute smoke test, `recommended`
+(MFA + Dr.VOT) for analysis you intend to report — with every individual
+setting exposed and documented. The sections below cover the same ground in
+prose, and remain the reference for running TAPA outside Colab.
 
 ## Quick Start: Google Colab end-to-end walkthrough
 
@@ -70,14 +89,19 @@ If you want **only the default backend**:
 If you want **the Dr.VOT backend** (recommended for stop-VOT analysis):
 
 ```python
-# Dr.VOT ships its own GUI-Praat binary that needs GTK 2 at runtime, so we
-# install libgtk2.0-0 + a couple of friends along with praat and sox.
-# ffmpeg is needed for YouTube downloads.
-!apt-get install -y -qq ffmpeg praat sox libgtk2.0-0 libglib2.0-0 libxtst6
+# Dr.VOT calls Praat and sox while extracting features; without either, every
+# token silently falls back to the Praat estimator. We install Praat's
+# "barren" build, which is headless — Dr.VOT bundles a GUI Praat that needs
+# GTK 2 and fails on a stock Colab image. ffmpeg is needed for YouTube.
+!apt-get install -y -qq ffmpeg sox
+!wget -q -O /tmp/praat.tar.gz https://github.com/praat/praat/releases/download/v6.4.30/praat6430_linux-intel64-barren.tar.gz
+!tar xzf /tmp/praat.tar.gz -C /tmp && mv -f /tmp/praat_barren /usr/local/bin/praat && chmod +x /usr/local/bin/praat
 # The "tapa[drvot]" form tells pip to also install Dr.VOT's extra deps
-# (boltons, pydub, textgrid, noisereduce). The "@ git+..." form tells pip
-# to install from this GitHub repo rather than from PyPI.
+# (boltons, pydub, textgrid). The "@ git+..." form tells pip to install from
+# this GitHub repo rather than from PyPI.
 !pip install -q "tapa[drvot] @ git+https://github.com/sarmadchandio/tapa.git"
+# Confirm the tools are all present before running anything long:
+!python -m tapa.environment --vot-backend drvot --drvot-repo /content/Dr.VOT
 ```
 
 ### Cell 2 — install MFA (recommended)
@@ -166,6 +190,20 @@ results = pipeline.run("/content/my_recording.mp3")
 > left-sidebar folder icon, and re-run the cell — TAPA picks up
 > `/content/cookies.txt` automatically. Full walkthrough in
 > [Common issues](#common-issues).
+
+> **Note — YouTube cookies are used by default.** YouTube increasingly
+> blocks anonymous downloads, so TAPA looks for cookies automatically: first
+> a `cookies.txt` file (`$TAPA_YT_COOKIES`, the working directory,
+> `/content`, or `~`), then, on a machine that has a browser installed, that
+> browser's own YouTube cookies. **If you are logged in, these are your
+> account's cookies, and YouTube sees the download as coming from your
+> account.** Cookies are read locally and sent only to YouTube as part of
+> the download request — TAPA never stores, copies, or transmits them
+> anywhere else. To turn this off, pass
+> `TAPAConfig(youtube_cookies_from_browser="none")` (CLI:
+> `--yt-cookies-from-browser none`); to use a specific file instead, pass
+> `youtube_cookies_file="/path/to/cookies.txt"` (CLI: `--yt-cookies`).
+> Analysing a local audio file never touches YouTube or cookies at all.
 
 Result CSVs and JSONs land in `./results/`. The video ID (or local
 filename) becomes the stem, so for the URL above you'll get
@@ -285,7 +323,19 @@ acoustic + dictionary, Silero, and Resemblyzer weights.
 | Negative VOT (prevoicing) | not handled | handled (`POS` aspirated / `NEG` prevoiced output) |
 | Robustness on noisy or coarticulated speech | brittle | substantially better |
 | Languages | language-agnostic in principle | English-trained; degrades on others |
-| Extra setup | none | `python -m tapa.drvot setup <dir>` |
+| Extra setup | none | `python -m tapa.drvot setup <dir>`, plus Praat and sox |
+| Measured on a 2-minute conversational sample | voiceless 0.5 ms, voiced 0.5 ms, ~70 % of tokens at the floor | voiceless 22 ms, voiced 16 ms, no tokens at the floor |
+
+The last row is the one that matters for study design. English voiceless stops
+should measure tens of milliseconds longer than voiced ones; the Praat backend
+did not separate them at all on conversational audio, so **treat its VOT output
+as indicative only**. Vowel formants and fricative moments are unaffected by
+this choice — both backends share the same code for those.
+
+Dr.VOT also depends on the phoneme boundaries it is handed. Run it with MFA:
+on the same sample it gave voiceless 22 ms against voiced 16 ms with forced
+alignment, but voiced *longer* than voiceless (39 ms against 25 ms) when fed
+CMUdict's approximate boundaries, which is not a possible result.
 
 When you choose `vot_backend="drvot"`, every stop token in the output JSON
 gets two extra fields: `vot_method` (`"drvot"` or `"tapa-fallback"`) and
@@ -318,7 +368,11 @@ brew install ffmpeg
 
 CUDA is used automatically when available (Whisper + Resemblyzer). Dr.VOT
 itself runs on CPU. For Dr.VOT you also need `praat` and `sox` on PATH —
-`apt-get install praat sox` on Ubuntu, `brew install praat sox` on macOS.
+`apt-get install praat sox` on Ubuntu, `brew install praat sox` on macOS. On a
+headless machine, prefer Praat's [barren
+build](https://github.com/praat/praat/releases), which needs no GUI libraries.
+`python -m tapa.environment --vot-backend drvot --drvot-repo <dir>` verifies
+all of this, including that Praat can run a script without a display.
 
 ### MFA setup (non-Colab)
 
@@ -370,13 +424,31 @@ to the results directory:
 | `<stem>_diarization.csv` | Speaker segments (`speaker, start, end`) |
 | `<stem>_transcription.csv` | Word-level transcript with speaker labels |
 | `<stem>_transcription.txt` | Human-readable transcript |
-| `<stem>_aligned.TextGrid` | MFA phoneme alignment (only if MFA installed) |
+| `<stem>_aligned.TextGrid` | MFA phoneme alignment, when aligning the recording as one utterance |
+| `<stem>_aligned_textgrids/` | One TextGrid per speaker turn, when `mfa_split_utterances=True` (the default) |
+| `<stem>_run_summary.json` | What the run actually did — see below |
 | `<stem>_vowel_formants.json` | Raw vowel F1/F2/pitch per token |
 | `<stem>_vowel_averages.csv` | Per-speaker per-vowel average formants |
 | `<stem>_stop_vot.json` | Raw stop VOT measurements per token |
 | `<stem>_stop_averages.csv` | Per-speaker per-stop average VOT |
 | `<stem>_fricative_spectra.json` | Raw fricative spectral moments per token |
 | `<stem>_fricative_averages.csv` | Per-speaker per-fricative averages |
+
+### `<stem>_run_summary.json` — check this before trusting a run
+
+The pipeline degrades rather than stopping: if MFA fails it falls back to
+CMUdict proportional timing, and if Dr.VOT fails it falls back to the Praat
+estimator, token by token. Both produce a complete set of result files, so a
+degraded run looks exactly like a good one. The run summary is how you tell
+them apart. It records what you *requested* against what actually *happened*
+— alignment method, VOT method with per-method token counts, speaker count,
+out-of-vocabulary share — plus a `degradations` list, which is also printed at
+the end of the run. An empty list means every component you asked for ran.
+
+Set `TAPAConfig(strict=True)` to turn any degradation into an error instead,
+which is what you want for numbers you intend to publish. To check the
+external tools a configuration needs before starting, run
+`python -m tapa.environment --vot-backend drvot --drvot-repo /path/to/Dr.VOT`.
 
 **When `vot_backend="drvot"`**, each token in `*_stop_vot.json` carries two
 extra fields: `vot_method` (`"drvot"` / `"tapa-fallback"`) and
@@ -506,7 +578,15 @@ stop_data = extract_all_stop_measurements_drvot(speaker_stops, audio_np, cfg)
 | `sample_rate` | `16000` | Audio sample rate for processing |
 | `whisper_model` | `"small.en"` | Whisper model (`tiny.en`, `base.en`, `small.en`, `medium.en`, `large`) |
 | `mfa_bin` | `None` | Path to MFA binary (`None` = auto-detect) |
-| `num_speakers` | `None` | Number of speakers (`None` = auto-detect) |
+| `num_speakers` | `None` | Number of speakers (`None` = estimate it). Supply it when you know the count — estimation is good but never better than knowing |
+| `max_speakers` | `8` | Upper bound when estimating |
+| `min_speaker_silhouette` | `0.15` | Below this no split is convincing and the recording is reported as one speaker |
+| `min_segments_per_speaker` | `4` | Caps the estimate on short recordings, so a handful of segments cannot become a handful of speakers |
+| `min_speaker_share` | `0.0` | `0` = off. e.g. `0.02` absorbs any speaker holding under 2 % of the speech into the nearest one |
+| `strict` | `False` | Raise instead of degrading quietly (MFA falling back to CMUdict, Dr.VOT falling back to Praat). Turn on for results you intend to publish |
+| `mfa_split_utterances` | `True` | Align per diarization segment rather than feeding MFA the whole recording as one utterance; keeps alignment memory flat with duration |
+| `mfa_num_jobs` | `2` | MFA worker processes; 2 suits Colab's 2 vCPUs |
+| `mfa_timeout_s` | `1800` | Kill MFA and fall back if an alignment overruns |
 | `min_segment_duration` | `0.1` | Minimum speech segment duration (seconds) |
 | `merge_gap` | `0.5` | Merge same-speaker segments closer than this (seconds) |
 | `min_vowel_duration` | `0.03` | Minimum vowel duration to analyze (seconds) |

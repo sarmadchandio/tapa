@@ -50,6 +50,11 @@ from .phoneme_maps import ARPABET_VOWELS
 DRVOT_REPO_URL = "https://github.com/MLSpeech/Dr.VOT"
 HARD_CODED_PRAAT = "/home/yosi/custom_commands/praat"
 PATCH_TARGETS = ("process_data/extract_voice_starts.py", "process_data/pitch_process.py")
+# Call sites that force Dr.VOT's own bundled Praat binary regardless of the
+# patched default above; both are rewritten to the system Praat.
+PIPELINE_TARGET = "process_data_pipeline.py"
+BUNDLED_PRAAT_EXPR = 'os.path.join(os.getcwd(),"linux_praat")'
+MAC_PRAAT_LITERAL = '"/Applications/Praat.app/Contents/MacOS/Praat"'
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +106,21 @@ def setup_drvot(repo_dir: str | os.PathLike, force: bool = False) -> str:
         if HARD_CODED_PRAAT in text:
             f.write_text(text.replace(HARD_CODED_PRAAT, praat_path))
             patched += 1
+
+    # process_data_pipeline.py appends "--praat <cwd>/linux_praat" to the
+    # arguments it hands extract_voice_starts. argparse prefix-matches that to
+    # --praat_path, so it silently overrides the default patched above, and the
+    # bundled linux_praat is a GUI build that needs GTK 2 at runtime — absent
+    # from a stock Colab image, where it dies as PraatExecutionFailed. Point
+    # those call sites at the same system Praat.
+    pipe = repo / PIPELINE_TARGET
+    if pipe.exists():
+        text = pipe.read_text()
+        new = text.replace(BUNDLED_PRAAT_EXPR, repr(praat_path))
+        new = new.replace(MAC_PRAAT_LITERAL, repr(praat_path))
+        if new != text:
+            pipe.write_text(new)
+            patched += 1
     _log(f"patched Praat path -> {praat_path} ({patched} file(s))")
 
     # Make the bundled feature extractor executable. The repo ships a Linux
@@ -122,26 +142,54 @@ def setup_drvot(repo_dir: str | os.PathLike, force: bool = False) -> str:
             "the clone may be incomplete or the upstream layout changed."
         )
 
-    # Dr.VOT ships its own GUI-Praat binary at <repo>/linux_praat. Verify it
-    # can actually run by trying its --version. If GTK shared libraries are
-    # missing the binary errors out and the features step fails ~3 minutes
-    # later with a confusing praatio traceback. Surface the issue here.
-    bundled_praat = repo / "linux_praat"
-    if bundled_praat.exists():
-        try:
-            check = subprocess.run([str(bundled_praat), "--version"],
-                                   capture_output=True, text=True, timeout=10)
-            if check.returncode != 0 and "libgtk" in (check.stderr or ""):
-                _log("WARNING: Dr.VOT's bundled linux_praat needs libgtk2 "
-                     "(missing from this environment). Run: "
-                     "apt-get install -y libgtk2.0-0 libglib2.0-0 libxtst6")
-            elif check.returncode != 0:
-                _log(f"WARNING: bundled linux_praat exited {check.returncode}: "
-                     f"{(check.stderr or '').strip()[:200]}")
-        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            _log(f"WARNING: could not verify bundled linux_praat: {e}")
+    # Verify the Praat we just patched in can actually run a script headlessly.
+    # Doing it here means a broken Praat is reported during setup rather than
+    # as a praatio traceback several minutes into feature extraction.
+    _verify_praat(praat_path)
+
+    # Dr.VOT's feature extractor shells out to sox. Without it phase 4 dies
+    # with a bare "/bin/sh: 1: sox: not found" and every token silently falls
+    # back to the Praat estimator, so check for it here.
+    if shutil.which("sox") is None:
+        _log("WARNING: 'sox' is not on PATH — Dr.VOT's feature extraction will "
+             "fail and every token will fall back to TAPA-Praat. "
+             "Install it: apt-get install -y sox  (or: conda install -c conda-forge sox)")
+    else:
+        _log(f"found sox: {shutil.which('sox')}")
 
     return str(repo)
+
+
+def _verify_praat(praat_path):
+    """Run a trivial Praat script to confirm it works without a display."""
+    script = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".praat", delete=False) as fh:
+            fh.write('writeInfoLine: "tapa_praat_ok"\n')
+            script = fh.name
+        check = subprocess.run([praat_path, "--run", script],
+                               capture_output=True, text=True, timeout=30)
+        if check.returncode == 0 and "tapa_praat_ok" in (check.stdout or ""):
+            _log(f"verified Praat runs headlessly: {praat_path}")
+            return
+        err = ((check.stderr or "") + (check.stdout or "")).strip()
+        hint = ""
+        if "libgtk" in err or "cannot open shared object" in err:
+            hint = ("  Missing GUI libraries — try: apt-get install -y "
+                    "libgtk2.0-0 libglib2.0-0 libxtst6")
+        elif "display" in err.lower():
+            hint = ("  Praat wants an X display — install a headless-capable "
+                    "build, or run under xvfb-run.")
+        _log(f"WARNING: {praat_path} failed a trivial script "
+             f"(exit {check.returncode}): {err[:200]}{hint}")
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+        _log(f"WARNING: could not verify Praat at {praat_path}: {e}")
+    finally:
+        if script:
+            try:
+                os.unlink(script)
+            except OSError:
+                pass
 
 
 # ---------------------------------------------------------------------------

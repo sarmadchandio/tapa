@@ -4,10 +4,10 @@ import csv
 
 import numpy as np
 import torch
-import torchaudio
 from scipy.cluster.hierarchy import fcluster, linkage
-from scipy.spatial.distance import pdist
+from scipy.spatial.distance import pdist, squareform
 
+from .audio import load_audio_16k
 from .config import TAPAConfig
 
 
@@ -20,20 +20,23 @@ def load_silero_vad():
     return model, utils[0]
 
 
-def get_speech_segments(audio_path, vad_model, get_speech_timestamps, cfg=None):
+def get_speech_segments(audio, vad_model, get_speech_timestamps, cfg=None):
     """Detect speech segments using Silero VAD.
 
-    Returns (segments, wav_1d_tensor, sample_rate).
+    ``audio`` is either a path or a float32 mono 16 kHz numpy array (as
+    returned by load_audio_16k) — passing the array lets callers decode the
+    file once and share the buffer across pipeline stages.
+
+    Returns (segments, wav_1d_tensor, sample_rate). The tensor shares memory
+    with the input array when one is given.
     """
     if cfg is None:
         cfg = TAPAConfig()
-    wav, sr = torchaudio.load(audio_path)
-    if sr != 16000:
-        wav = torchaudio.functional.resample(wav, sr, 16000)
-        sr = 16000
-    if wav.shape[0] > 1:
-        wav = wav.mean(dim=0, keepdim=True)
-    wav_1d = wav.squeeze(0)
+    sr = 16000
+    if isinstance(audio, np.ndarray):
+        wav_1d = torch.from_numpy(audio)
+    else:
+        wav_1d = torch.from_numpy(load_audio_16k(audio, sr))
     speech_timestamps = get_speech_timestamps(
         wav_1d, vad_model, sampling_rate=sr,
         min_speech_duration_ms=100, min_silence_duration_ms=300, speech_pad_ms=30,
@@ -64,10 +67,22 @@ def assign_speakers(segments, audio_np_16k, sr, voice_encoder, cfg=None):
     if len(embeddings) < 2:
         return [{"speaker": "SPEAKER_00", **s} for s in segments]
     embs = np.array(embeddings)
-    dists = pdist(embs, metric="cosine")
+    # Ward is defined for Euclidean distances; Resemblyzer embeddings are
+    # unit-norm, where squared Euclidean is just 2x cosine distance, so this
+    # keeps the geometry and makes the linkage valid.
+    dists = pdist(embs, metric="euclidean")
     Z = linkage(dists, method="ward")
-    labels = (fcluster(Z, t=cfg.num_speakers, criterion="maxclust") if cfg.num_speakers
-              else fcluster(Z, t=1.5, criterion="distance"))
+    if cfg.num_speakers:
+        labels = fcluster(Z, t=cfg.num_speakers, criterion="maxclust")
+    else:
+        k, score = _estimate_num_speakers(Z, squareform(dists), cfg)
+        labels = (fcluster(Z, t=k, criterion="maxclust") if k > 1
+                  else np.ones(len(embs), dtype=int))
+        print(f"[TAPA] Estimated {k} speaker(s) (silhouette {score:+.2f}). "
+              f"Pass num_speakers=N if you know the true count.", flush=True)
+    if cfg.min_speaker_share > 0:
+        labels = _absorb_small_clusters(labels, embs, segments, valid_idx, cfg)
+
     lmap = {}
     labeled = []
     for idx, vi in enumerate(valid_idx):
@@ -82,6 +97,114 @@ def assign_speakers(segments, audio_np_16k, sr, voice_encoder, cfg=None):
             labeled.append({"speaker": nearest["speaker"], **seg})
     labeled.sort(key=lambda s: s["start"])
     return _merge_segments(labeled, cfg)
+
+
+def _silhouette(D, labels):
+    """Mean silhouette coefficient for a labelling, from a distance matrix."""
+    uniq = np.unique(labels)
+    if len(uniq) < 2:
+        return -1.0
+    n = len(labels)
+    sums = np.empty((n, len(uniq)))
+    counts = np.empty(len(uniq))
+    for j, lab in enumerate(uniq):
+        mask = labels == lab
+        counts[j] = mask.sum()
+        sums[:, j] = D[:, mask].sum(axis=1)
+    own = np.searchsorted(uniq, labels)
+    rows = np.arange(n)
+    own_cnt = counts[own] - 1                       # exclude the point itself
+    a = np.where(own_cnt > 0, sums[rows, own] / np.maximum(own_cnt, 1), 0.0)
+    means = sums / counts[None, :]
+    means[rows, own] = np.inf                       # nearest *other* cluster
+    b = means.min(axis=1)
+    denom = np.maximum(a, b)
+    s = np.where(denom > 0, (b - a) / denom, 0.0)
+    # A cluster of one has no within-cluster distance, which would otherwise
+    # score a perfect 1.0 and make "every segment is its own speaker" look
+    # ideal. By convention singletons score 0.
+    s[own_cnt == 0] = 0.0
+    return float(s.mean())
+
+
+def _estimate_num_speakers(Z, D, cfg):
+    """Pick the speaker count by silhouette score; returns (k, score).
+
+    A fixed distance cut cannot be used here: Ward merge heights grow with
+    cluster size, so the same threshold yields more and more clusters as a
+    recording lengthens — a 2 h recording was split into 8 speakers where the
+    same audio at 20 min gave 2. Silhouette compares labellings on a scale-free
+    basis, so its answer does not drift with recording length. Below
+    min_speaker_silhouette no split is convincing and we report one speaker.
+    """
+    best_k, best_score = 1, -1.0
+    # Each speaker needs a few segments before a split means anything; without
+    # this a short recording with a handful of segments can be carved into as
+    # many "speakers" as it has segments.
+    kmax = min(cfg.max_speakers, len(D) // cfg.min_segments_per_speaker)
+    for k in range(2, kmax + 1):
+        labels = fcluster(Z, t=k, criterion="maxclust")
+        if len(np.unique(labels)) < 2:
+            continue
+        score = _silhouette(D, labels)
+        if score > best_score:
+            best_score, best_k = score, k
+    if best_score < cfg.min_speaker_silhouette:
+        return 1, best_score
+    return best_k, best_score
+
+
+def _absorb_small_clusters(labels, embs, segments, valid_idx, cfg):
+    """Reassign clusters holding less than cfg.min_speaker_share of the speech.
+
+    Automatic speaker-count estimation can split one talker into several
+    clusters when their voice varies (loudness, laughter, channel changes).
+    Such spurious clusters are typically tiny; each of their segments is moved
+    to the nearest surviving cluster by cosine distance between the segment's
+    embedding and the cluster centroid. Off by default (share = 0).
+    """
+    labels = np.asarray(labels).copy()
+    durations = {}
+    for idx, vi in enumerate(valid_idx):
+        seg = segments[vi]
+        durations[int(labels[idx])] = durations.get(int(labels[idx]), 0.0) + (seg["end"] - seg["start"])
+    total = sum(durations.values())
+    if total <= 0:
+        return labels
+    small = {c for c, d in durations.items() if d / total < cfg.min_speaker_share}
+    keep = [c for c in durations if c not in small]
+    if not small or not keep:
+        return labels
+
+    centroids = {}
+    for c in keep:
+        rows = embs[labels == c]
+        v = rows.mean(axis=0)
+        n = np.linalg.norm(v)
+        centroids[c] = v / n if n else v
+    for idx in range(len(labels)):
+        if int(labels[idx]) not in small:
+            continue
+        e = embs[idx]
+        n = np.linalg.norm(e)
+        e = e / n if n else e
+        labels[idx] = max(keep, key=lambda c: float(np.dot(e, centroids[c])))
+    print(f"[TAPA] Merged {len(small)} speaker cluster(s) holding less than "
+          f"{cfg.min_speaker_share:.0%} of speech into the nearest speaker.", flush=True)
+    return labels
+
+
+def speaker_summary(segments):
+    """Per-speaker speech time and segment count, longest first."""
+    stats = {}
+    for s in segments:
+        d = stats.setdefault(s["speaker"], {"seconds": 0.0, "segments": 0})
+        d["seconds"] += s["end"] - s["start"]
+        d["segments"] += 1
+    total = sum(v["seconds"] for v in stats.values()) or 1.0
+    for v in stats.values():
+        v["share"] = v["seconds"] / total
+    return dict(sorted(stats.items(), key=lambda kv: -kv[1]["seconds"]))
 
 
 def _merge_segments(segments, cfg):

@@ -33,8 +33,9 @@ Inputs accepted: local `.mp3` / `.wav` / `.flac` files, **and YouTube URLs**
 
 ## Before you begin
 
-- **You need a Google account.** The walkthrough below uses Google Colab —
-  a free, browser-based notebook environment.
+- **Two ways to run this.** In Google Colab (nothing to install, free GPU) or
+  on your own machine. [Which setup do I need?](#which-setup-do-i-need)
+  compares them; follow one section and ignore the other.
 - **The pipeline works best on English audio.** Whisper has multilingual
   models you can swap in (`whisper_model="medium"`), but Dr.VOT is
   English-trained, so for non-English recordings use the default
@@ -66,7 +67,29 @@ It is preset-driven — `quick` for a two-minute smoke test, `recommended`
 setting exposed and documented. The sections below cover the same ground in
 prose, and remain the reference for running TAPA outside Colab.
 
-## Quick Start: Google Colab end-to-end walkthrough
+## Which setup do I need?
+
+Two ways to run TAPA. Pick one and follow only that section — everything after
+them (backends, outputs, configuration, troubleshooting) applies to both.
+
+| | **Google Colab** | **Local machine** |
+|---|---|---|
+| Setup | nothing to install; runs in a browser | Python 3.10+, ffmpeg, and a package manager |
+| GPU | free T4, no hardware needed | your own, or CPU (slower) |
+| Recording length | up to ~5 hours; the session ends when you close it | limited only by your disk |
+| Sensitive audio | uploaded to Google's servers | never leaves your machine |
+| Best for | trying TAPA, one-off analyses, no local setup | studies, batches, restricted data |
+
+**→ [Set up on Google Colab](#setup-google-colab)**  ·  **→ [Set up locally](#setup-local-machine)**
+
+If you are working with interviews or any identifiable participants, use the
+local route and read the [usage policy](#usage-policy) first.
+
+---
+
+## Setup: Google Colab
+
+*Running locally instead? Skip to [Set up locally](#setup-local-machine).*
 
 This is the canonical path for a new analysis.
 
@@ -318,6 +341,98 @@ acoustic + dictionary, Silero, and Resemblyzer weights.
 
 ---
 
+## Setup: local machine
+
+*Using Colab instead? See [Set up on Google Colab](#setup-google-colab).*
+
+Requires **Python 3.10+** and **ffmpeg**. CUDA is used automatically when
+available (Whisper and Resemblyzer); Dr.VOT itself runs on CPU.
+
+### 1. System packages
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+
+# macOS
+brew install ffmpeg
+```
+
+### 2. TAPA
+
+```bash
+# Core install
+pip install git+https://github.com/sarmadchandio/tapa.git
+
+# ...or with the Dr.VOT extras, if you want the neural VOT backend
+pip install "tapa[drvot] @ git+https://github.com/sarmadchandio/tapa.git"
+```
+
+yt-dlp is the component that keeps up with YouTube's changes, and `pip
+install` always pulls the current version.
+
+### 3. Montreal Forced Aligner — recommended
+
+Without MFA, phoneme boundaries fall back to CMUdict proportional timing,
+which is too approximate to publish from.
+
+```bash
+conda install -c conda-forge montreal-forced-aligner
+mfa model download acoustic english_us_arpa
+mfa model download dictionary english_us_arpa
+```
+
+### 4. Dr.VOT — needed only for stop VOT
+
+Dr.VOT calls Praat and sox while extracting features; without either, every
+token silently falls back to the Praat estimator.
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install praat sox
+# macOS
+brew install praat sox
+
+python -m tapa.drvot setup ~/Dr.VOT
+```
+
+On a headless machine — a server or an HPC node — install Praat's
+[barren build](https://github.com/praat/praat/releases) instead of the
+packaged one: it needs no GUI libraries, which is the usual cause of Dr.VOT
+failing to start.
+
+### 5. Check the setup
+
+```bash
+python -m tapa.environment --vot-backend drvot --drvot-repo ~/Dr.VOT
+```
+
+This reports every external tool the configuration needs, with a fix for
+anything missing, and confirms Praat can run a script without a display. Do
+this before a long run: a missing tool does not stop the pipeline, it quietly
+degrades the results.
+
+### 6. Run it
+
+```python
+from tapa import TAPAPipeline, TAPAConfig
+
+pipeline = TAPAPipeline(TAPAConfig(
+    vot_backend="drvot",              # omit for the Praat backend
+    drvot_repo_dir="~/Dr.VOT",
+    strict=True,                      # refuse to degrade silently
+))
+results = pipeline.run("interview.mp3")
+```
+
+Or from the shell — see [Command line](#command-line) for all flags:
+
+```bash
+tapa interview.mp3 -o results/ --vot-backend drvot --drvot-repo ~/Dr.VOT
+```
+
+---
+
 ## Backend choices: TAPA vs Dr.VOT
 
 | | TAPA (default) | Dr.VOT |
@@ -346,53 +461,6 @@ gets two extra fields: `vot_method` (`"drvot"` or `"tapa-fallback"`) and
 `vot_class_drvot` (`"POS"` for aspirated, `"NEG"` for prevoiced, `null` for
 fallback rows). The aggregated `*_stop_averages.csv` is unchanged so existing
 analysis code keeps working.
-
----
-
-## Installation (other environments)
-
-```bash
-# Core install
-pip install git+https://github.com/sarmadchandio/tapa.git
-
-# With Dr.VOT extras
-pip install "tapa[drvot] @ git+https://github.com/sarmadchandio/tapa.git"
-```
-
-Requires **Python 3.10+** and **ffmpeg**. yt-dlp ≥ 2025 is the version that
-keeps up with current YouTube; `pip install` always pulls the latest.
-
-```bash
-# Ubuntu/Debian
-sudo apt-get install ffmpeg
-
-# macOS
-brew install ffmpeg
-```
-
-CUDA is used automatically when available (Whisper + Resemblyzer). Dr.VOT
-itself runs on CPU. For Dr.VOT you also need `praat` and `sox` on PATH —
-`apt-get install praat sox` on Ubuntu, `brew install praat sox` on macOS. On a
-headless machine, prefer Praat's [barren
-build](https://github.com/praat/praat/releases), which needs no GUI libraries.
-`python -m tapa.environment --vot-backend drvot --drvot-repo <dir>` verifies
-all of this, including that Praat can run a script without a display.
-
-### MFA setup (non-Colab)
-
-```bash
-conda install -c conda-forge montreal-forced-aligner
-mfa model download acoustic english_us_arpa
-mfa model download dictionary english_us_arpa
-```
-
-### Dr.VOT setup (non-Colab)
-
-```bash
-python -m tapa.drvot setup ~/Dr.VOT
-# then, when running TAPA:
-tapa interview.mp3 --vot-backend drvot --drvot-repo ~/Dr.VOT
-```
 
 ---
 
@@ -619,13 +687,17 @@ URL form (`youtube.com/watch?v=…`, `youtu.be/…`, `youtube.com/shorts/…`).
 
 ## Common issues
 
+Items marked **(Colab)** apply only to the notebook environment;
+**(local)** only to your own machine. Everything else applies to both.
+
+
 **"`No video formats found`" / yt-dlp errors when passing a URL.**
 Your runtime has a stale `yt-dlp`. Restart the Colab runtime (Runtime →
 Disconnect and delete runtime), then re-run the install cell — it pulls
 the latest version. On a non-Colab machine: `pip install -U yt-dlp` and
 retry.
 
-**"`Sign in to confirm you're not a bot`" on Colab.** TAPA tries two
+**"`Sign in to confirm you're not a bot`" when downloading. (both)** TAPA tries two
 downloaders automatically: first `yt-dlp` with alternate player clients
 (`mweb`, `tv_simply`, `android_vr`, `web_safari`), and if that gets bot-
 checked, `pytubefix` with a different code path. On a local machine with a
@@ -654,11 +726,11 @@ To point at a non-standard location explicitly:
 Cookies are only sent to YouTube for the fetch — your audio file isn't
 re-uploaded anywhere.
 
-**Whisper / diarization runs on CPU instead of GPU.** The `[TAPA] Device:`
+**Whisper / diarization runs on CPU instead of GPU. (Colab)** The `[TAPA] Device:`
 line will say `CPU` — meaning you forgot to switch the runtime. Click
 Runtime → Change runtime type → T4 GPU → Save, then run the cells again.
 
-**MFA install seems hung in Cell 2.** It legitimately takes 2–4 minutes the
+**MFA install seems hung. (Colab)** It legitimately takes 2–4 minutes the
 first time (Miniforge download + conda solve + acoustic + dictionary
 models). It's quick on subsequent runs in the same session.
 
@@ -677,11 +749,11 @@ tokens.
 **Non-English audio.** Use `TAPAConfig(whisper_model="medium")` (not
 `medium.en`). Stick to `vot_backend="tapa"` since Dr.VOT was English-trained.
 
-**"Out of memory" on long recordings.** Free-tier Colab has ~12 GB RAM. For
+**"Out of memory" on long recordings. (Colab)** Free-tier Colab has ~12 GB RAM. For
 recordings longer than ~1 hour use `TAPAConfig(whisper_model="tiny.en")`,
 or split the audio first with ffmpeg.
 
-**Colab session disconnected mid-run.** Free-tier sessions time out after
+**Session disconnected mid-run. (Colab)** Free-tier sessions time out after
 ~90 minutes idle. For long batches use a Colab Pro runtime, or save your
 intermediate results to Google Drive (`drive.mount("/content/drive")` then
 set `results_dir="/content/drive/MyDrive/tapa_results/"`).

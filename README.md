@@ -46,6 +46,10 @@ Inputs accepted: local `.mp3` / `.wav` / `.flac` files, **and YouTube URLs**
 - **Plan for time.** A 30-minute recording takes about 5 min with the
   default backend, or ~25 min with the Dr.VOT backend. See the wall-clock
   table below.
+- **YouTube downloads use your cookies by default**, including your browser's
+  own YouTube session when one is available, so YouTube attributes the
+  download to your account. See [Usage policy](#usage-policy) for what is sent
+  where and how to switch it off. Local audio files never touch the network.
 
 ---
 
@@ -681,6 +685,71 @@ or split the audio first with ffmpeg.
 ~90 minutes idle. For long batches use a Colab Pro runtime, or save your
 intermediate results to Google Drive (`drive.mount("/content/drive")` then
 set `results_dir="/content/drive/MyDrive/tapa_results/"`).
+
+---
+
+## Usage policy
+
+### The downloader uses your YouTube cookies by default
+
+YouTube increasingly refuses anonymous downloads, particularly from cloud IP
+ranges such as Colab's. So when TAPA is given a YouTube URL it looks for
+cookies automatically, in this order:
+
+1. a cookies file — the path in `$TAPA_YT_COOKIES` if set, then
+   `cookies.txt` or `youtube_cookies.txt` in the working directory, then the
+   same two names in `/content` (Colab's upload directory), then
+   `~/cookies.txt`;
+2. failing that, on a machine with a browser installed, **the YouTube cookies
+   belonging to that browser profile**, taken straight from its cookie store.
+
+**If you are signed in to YouTube, these are your account's cookies, and
+YouTube sees the download as coming from your account.** Your account is
+therefore subject to whatever rate limiting, logging, or enforcement YouTube
+applies, exactly as if you had loaded the video in your browser. Treat this
+the same way you would treat any tool acting on your behalf with your session.
+
+What TAPA does with them: cookies are read locally and attached to the
+download request to YouTube. They are never written to the results directory,
+never uploaded anywhere else, and never logged. TAPA prints only the path of
+the cookie file it chose, or the name of the browser it read from.
+
+To turn the behaviour off, or pin it to a file you control:
+
+```python
+TAPAConfig(youtube_cookies_from_browser="none")          # no cookies at all
+TAPAConfig(youtube_cookies_file="/path/to/cookies.txt")  # only this file
+```
+```bash
+tapa "https://..." --yt-cookies-from-browser none
+tapa "https://..." --yt-cookies /path/to/cookies.txt
+```
+
+Nothing in this section applies when you analyse a local audio file: the
+download code never runs, and no network request is made.
+
+### Downloading other people's videos
+
+Downloading from YouTube may conflict with its Terms of Service, and the
+recordings themselves are usually copyrighted. Whether your use is permitted —
+research exemptions, fair use or fair dealing, an institutional licence, or the
+uploader's own permission — depends on your jurisdiction and your institution.
+That judgement is yours to make. TAPA provides the mechanism, not the licence.
+
+### Recordings of people
+
+Speech recordings are personal data, and analysing them can reveal
+characteristics their speakers never consented to share. If you are working
+with interviews, clinical recordings, or anything involving identifiable
+participants, follow your institution's human-subjects process.
+
+For that setting it matters that **all analysis is local**: every model — VAD,
+speaker embeddings, Whisper, MFA, Praat, Dr.VOT — runs on your machine, and no
+audio, transcript, or measurement is transmitted anywhere. Network access is
+used only to install the software and download model weights on first use, and
+for the optional YouTube downloader. Once the model caches are populated you
+can disconnect from the network entirely and the pipeline still runs, which is
+a straightforward way to demonstrate the guarantee to a review board.
 
 ---
 

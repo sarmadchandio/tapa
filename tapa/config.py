@@ -98,6 +98,25 @@ class TAPAConfig:
     vot_backend: str = "tapa"
     drvot_repo_dir: Optional[str] = None
     drvot_python: Optional[str] = None  # None -> sys.executable
-    drvot_clip_pre_ms: float = 150.0    # padding before stop closure when cutting clips
+    # Padding before the stop closure when cutting clips. Keep this SMALL.
+    # Dr.VOT does not scan the clip: its front end takes the first point where
+    # pitch and intensity rise together (process_data/pitch_process.py) and
+    # analyses a single 250 ms window opening 50 ms before it
+    # (process_data/feature_extractor.py). Padding far enough back to include
+    # the preceding vowel anchors that window on the wrong event, and the
+    # release we care about falls at or past its far edge.
+    #
+    # Measured on 26 hand-checked tokens: at 150 ms the median error against a
+    # burst-onset reference is 134 ms and voiceless/voiced separation is d =
+    # -0.22 (i.e. backwards); at 25 ms the error is 20 ms and d = +1.39.
+    # Raising this to "give Dr.VOT more context" makes results worse, not
+    # better.
+    drvot_clip_pre_ms: float = 25.0
     drvot_clip_post_ms: float = 150.0   # padding after the following vowel
     drvot_keep_temp: bool = False       # keep clip temp dir for debugging
+
+    # Apply Dr.VOT's POS_VOT/NEG_VOT class to the magnitude it reports, so a
+    # prevoiced token is stored as a negative VOT (the usual convention) rather
+    # than as an equally large positive one. Set False only to reproduce output
+    # from before this was fixed.
+    drvot_signed_vot: bool = True

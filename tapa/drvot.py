@@ -423,6 +423,27 @@ def _parse_summary(csv_path: Path) -> dict[str, dict]:
     return out
 
 
+def _signed_vot(pred: dict, cfg: TAPAConfig) -> float:
+    """Apply Dr.VOT's voicing class to the magnitude it reports.
+
+    Dr.VOT returns two things per token: a duration in ms, always positive, and
+    a class — ``POS_VOT`` (voicing begins after the release) or ``NEG_VOT``
+    (voicing begins before it, i.e. prevoicing). The duration alone cannot tell
+    those apart: a token voiced 100 ms *before* release and one voiced 100 ms
+    *after* both arrive as ``100``. Storing the magnitude therefore collapses
+    the two ends of the voicing contrast onto the same number, which is the
+    opposite of what a VOT measurement is for.
+
+    Negative VOT for prevoicing is the standard convention (Lisker & Abramson
+    1964), so the sign is applied here rather than left to callers.
+    """
+    mag = abs(pred["vot_ms"])
+    if not getattr(cfg, "drvot_signed_vot", True):
+        return pred["vot_ms"]
+    cls = (pred.get("vot_class_drvot") or "").upper()
+    return -mag if "NEG" in cls else mag
+
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -431,9 +452,13 @@ def extract_all_stop_measurements_drvot(speaker_stops: dict, audio_np: np.ndarra
                                         cfg: Optional[TAPAConfig] = None) -> dict:
     """Drop-in replacement for ``extract_all_stop_measurements`` using Dr.VOT.
 
-    Same input/output schema; adds two extra fields per token:
+    Same input/output schema; adds three extra fields per token:
       - ``vot_method``: ``"drvot"`` or ``"tapa-fallback"``
       - ``vot_class_drvot``: ``"POS"``/``"NEG"``/None when Dr.VOT measured
+      - ``vot_magnitude_ms``: Dr.VOT's unsigned duration, kept so a run can be
+        compared against output from before the sign was applied
+
+    ``vot_ms`` is signed: negative for prevoiced tokens (see ``_signed_vot``).
 
     Tokens Dr.VOT cannot predict are re-measured with TAPA's Praat path so we
     keep coverage. If the Dr.VOT setup itself fails (missing repo, missing
@@ -491,7 +516,8 @@ def extract_all_stop_measurements_drvot(speaker_stops: dict, audio_np: np.ndarra
 
             if pred is not None:
                 meas = {
-                    "vot_ms": pred["vot_ms"],
+                    "vot_ms": _signed_vot(pred, cfg),
+                    "vot_magnitude_ms": pred["vot_ms"],
                     "burst_time": None,
                     "voicing_onset": None,
                     "closure_duration_ms": closure_ms,
@@ -524,6 +550,9 @@ def extract_all_stop_measurements_drvot(speaker_stops: dict, audio_np: np.ndarra
                 "word": entry["word"],
                 "vot_method": "tapa-fallback",
                 "vot_class_drvot": None,
+                # The Praat estimator has no voicing class, so its value is
+                # already the signed measurement and magnitude is just |value|.
+                "vot_magnitude_ms": abs(tapa_meas.get("vot_ms", 0.0)),
             })
             results[entry["speaker"]][entry["ipa"]].append(tapa_meas)
             n_fallback += 1

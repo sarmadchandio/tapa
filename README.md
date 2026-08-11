@@ -320,9 +320,14 @@ from the Dr.VOT subprocess.
 The `coverage:` line is the most important one to glance at. It tells you
 how many stop consonants Dr.VOT successfully measured versus how many
 needed the TAPA-Praat fallback. If the fallback rate is high (>30%) on a
-clean recording, the audio window we send to Dr.VOT may be too tight; you
-can widen it with `drvot_clip_pre_ms=200, drvot_clip_post_ms=200` in the
-config.
+clean recording, try widening the padding *after* the vowel
+(`drvot_clip_post_ms=200`).
+
+Do **not** raise `drvot_clip_pre_ms` to chase coverage. Dr.VOT anchors its
+analysis window on the first voicing in the clip, so padding back into the
+preceding vowel points that window at the wrong event — coverage stays high
+while the numbers quietly stop meaning anything. See the note on that
+setting in `tapa/config.py`.
 
 ### Wall-clock budget
 
@@ -676,9 +681,10 @@ stop_data = extract_all_stop_measurements_drvot(speaker_stops, audio_np, cfg)
 | `vot_backend` | `"tapa"` | `"tapa"` (Praat-based) or `"drvot"` (Dr.VOT CNN + per-token TAPA fallback) |
 | `drvot_repo_dir` | `None` | Path to a Dr.VOT clone — required when `vot_backend="drvot"` |
 | `drvot_python` | `None` | Python interpreter for Dr.VOT subprocesses (`None` = current Python) |
-| `drvot_clip_pre_ms` | `150.0` | Padding before stop closure when cutting clips for Dr.VOT |
+| `drvot_clip_pre_ms` | `25.0` | Padding before stop closure when cutting clips for Dr.VOT. Keep small — raising it breaks the measurement |
 | `drvot_clip_post_ms` | `150.0` | Padding after the following vowel |
 | `drvot_keep_temp` | `False` | Keep the per-recording Dr.VOT temp dir for inspection |
+| `drvot_signed_vot` | `True` | Store prevoiced tokens as negative VOT. `False` reproduces pre-fix output |
 
 Supported audio formats: `.mp3`, `.wav`, `.flac`. URLs: any standard YouTube
 URL form (`youtube.com/watch?v=…`, `youtu.be/…`, `youtube.com/shorts/…`).
@@ -740,11 +746,12 @@ you'd expect. If you know the number of speakers, set
 `TAPAConfig(num_speakers=2)` for cleaner clustering. Then rename them by
 post-processing the CSVs.
 
-**Dr.VOT coverage is low (<70%).** Two common causes: (a) clip windows are
-too tight — pass `drvot_clip_pre_ms=200, drvot_clip_post_ms=200` in
-`TAPAConfig`; (b) the recording is heavily reverberant or noisy and Dr.VOT
-genuinely can't anchor — the TAPA-Praat fallback will still measure those
-tokens.
+**Dr.VOT coverage is low (<70%).** Two common causes: (a) the clip ends too
+soon after the vowel — pass `drvot_clip_post_ms=200` in `TAPAConfig`; (b) the
+recording is heavily reverberant or noisy and Dr.VOT genuinely can't anchor —
+the TAPA-Praat fallback will still measure those tokens. Leave
+`drvot_clip_pre_ms` alone: raising it inflates coverage while making the
+measurements worse (see `tapa/config.py`).
 
 **Non-English audio.** Use `TAPAConfig(whisper_model="medium")` (not
 `medium.en`). Stick to `vot_backend="tapa"` since Dr.VOT was English-trained.

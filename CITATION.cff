@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+title: "TAPA: Toolkit for Acoustic-Phonetic Analysis"
+message: "If you use this software, please cite the article below."
+type: software
+authors:
+  - family-names: Kutlu
+    given-names: Ethan
+    affiliation: University of Iowa
+  - family-names: Peters
+    given-names: Emerson
+  - family-names: Tapanes
+    given-names: Ciara
+  - family-names: Chandio
+    given-names: Sarmad
+  - family-names: Khalid
+    given-names: Osama
+repository-code: "https://github.com/sarmadchandio/tapa"
+license: MIT
+preferred-citation:
+  type: article
+  title: "Toolkit for acoustic-phonetic analysis of naturalistic speech data"
+  authors:
+    - family-names: Kutlu
+      given-names: Ethan
+    - family-names: Peters
+      given-names: Emerson
+    - family-names: Tapanes
+      given-names: Ciara
+    - family-names: Chandio
+      given-names: Sarmad
+    - family-names: Khalid
+      given-names: Osama
+  journal: "Behavior Research Methods"
+  notes: "In press"

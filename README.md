@@ -2,6 +2,7 @@
 A single recording can take a long time to transcribe and acoustically analyze. Researchers working with long-form audio, or without a team of annotators, face a bottleneck that funding restrictions continue to tighten. Production data is expensive to work with, and that expense is not evenly distributed. 
 
 <img width="2388" height="1668" alt="TAPA1" src="https://github.com/user-attachments/assets/007a6a2f-69d5-4a4e-908e-3ff342c4461f" />
+Image artist: Adriana Ojeda
 
 We built TAPA to serve scientists in that position. The name comes from tapas, which is the Spanish tradition of small plates rather than one large dish. Each plate stands on its own, and the meal works because they arrive together. Tapas is also meant to be shared. It is a moment to celebrate communities, diversity of different flavors, and perspectives. TAPA is built the same way. It is meant to celebrate the diversity of voices. 
 
@@ -10,15 +11,6 @@ One thing tapas and TAPA have in common is that nobody leaves the the table and 
 Everything is open-source and runs on your own machine. Please enjoy! 
 
 To cite our work: Kutlu, E., Peters, E., Tapanes, C., Chandio, S., & Khalid, O. (in press). Toolkit for acoustic-phonetic analysis of naturalistic speech data. _Behavior Research Methods_.
-
-@article{kutlu_tapa_inpress,
-  author  = {Kutlu, Ethan and Peters, Emerson and Tapanes, Ciara and
-             Chandio, Sarmad and Khalid, Osama},
-  title   = {Toolkit for Acoustic-Phonetic Analysis of Naturalistic Speech Data},
-  journal = {Behavior Research Methods},
-  note    = {In press},
-  url     = {https://github.com/sarmadchandio/tapa}
-}
 
 Speaker diarization + phonetic analysis of audio recordings. Given an audio
 file (or a YouTube URL), TAPA identifies who is speaking, transcribes what

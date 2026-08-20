@@ -6,7 +6,7 @@ Image artist: Adriana Ojeda
 
 We built TAPA to serve scientists in that position. The name comes from tapas, which is the Spanish tradition of small plates rather than one large dish. Each plate stands on its own, and the meal works because they arrive together. Tapas is also meant to be shared. It is a moment to celebrate communities, diversity of different flavors, and perspectives. TAPA is built the same way. It is meant to celebrate the diversity of voices. 
 
-One thing tapas and TAPA have in common is that nobody leaves the the table and lets the kitchen decide. TAPA is a tool, not a replacement for a trained phonetician. Every measurement it produces needs your oversight, and we document where it falls short as carefully as where it works. 
+One thing tapas and TAPA have in common is that nobody leaves the table and lets the kitchen decide. TAPA is a tool, not a replacement for a trained phonetician. Every measurement it produces needs your oversight, and we document where it falls short as carefully as where it works. 
 
 Everything is open-source and runs on your own machine. Please enjoy! 
 

@@ -12,6 +12,9 @@ Everything is open-source and runs on your own machine. Please enjoy!
 
 To cite our work: Kutlu, E., Peters, E., Tapanes, C., Chandio, S., & Khalid, O. (in press). Toolkit for acoustic-phonetic analysis of naturalistic speech data. _Behavior Research Methods_.
 
+<img width="1668" height="2388" alt="Untitled design" src="https://github.com/user-attachments/assets/7445e812-1fe5-47aa-9d8e-87c10d12d6f7" />
+
+
 Speaker diarization + phonetic analysis of audio recordings. Given an audio
 file (or a YouTube URL), TAPA identifies who is speaking, transcribes what
 they say, and extracts detailed acoustic measurements per speaker.
